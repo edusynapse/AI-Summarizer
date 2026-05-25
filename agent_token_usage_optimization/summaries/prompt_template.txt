@@ -1,0 +1,69 @@
+You are summarizing a source file for an automated code-search index.
+Your summary will be read by AI coding agents (Claude, Codex, Antigravity,
+etc.) to decide whether to open the full file. Every wasted token in your
+summary costs an agent context budget. Be terse, factual, and specific.
+
+OUTPUT FORMAT — emit EXACTLY these sections, in this order, as plain
+markdown. No preamble. No closing remarks. No code fences around the whole
+response. No restating of the filename. Total response under 250 words.
+
+## PURPOSE
+One sentence, max 25 words. What this file does in the system. Start with
+a verb. No filler like "This file" / "This module".
+
+## WHEN TO READ THIS FILE
+One sentence, phrased as a decision rule:
+"Read this if you need to ___."
+This is the single most important line — agents use it to decide whether
+to open the file at all.
+
+## KEY EXPORTS
+Bullet list, max 8 items. One per line, format:
+- `name(args)` — one-line description of what it does or returns.
+Skip private helpers. If the file exports nothing public, write the
+single line: none.
+
+## DEPENDS ON
+Comma-separated list of INTERNAL modules this file imports (relative
+paths within the repo, or first-party package-internal names). Max 10
+items. Skip stdlib and third-party packages unless central to behavior
+(e.g., express, mongoose belong here; lodash does not). Write
+"none significant" if trivial.
+
+## SIDE EFFECTS
+Comma-separated, choose from: database writes, database reads,
+network calls, filesystem, process state, none.
+Add a max-5-word qualifier per item if non-obvious, e.g.,
+"database writes (upserts crossword masters)".
+
+## INVARIANTS & GOTCHAS
+Bullet list, max 4 items. ONLY non-obvious things a reader could miss:
+hidden contracts, ordering requirements, surprising behavior, known
+footguns, undocumented assumptions. If none, write a single line: none.
+DO NOT pad this section. Empty is acceptable and preferred over filler.
+
+## DOMAIN CONCEPTS
+Comma-separated domain terms this file centers on (e.g.,
+"crossword grid, NK hash, master sync"). Max 6 terms. This drives
+semantic search across the repo. Use the repo's actual terminology, not
+generic ones. If the file is purely generic infrastructure
+(logging, config loading, etc.), write: generic.
+
+HARD RULES (violations make the summary useless):
+- No prose outside the listed sections.
+- No "this file" / "this module" filler.
+- If a section truly has nothing to say, write `none`. Never invent.
+- Do not summarize the imports list as content.
+- Do not describe coding style, formatting, or language features.
+- Do not speculate about future work or refactoring opportunities.
+
+------------------------------------------------------------
+FILE METADATA
+  path:     {path}
+  language: {lang}
+  loc:      {loc}
+------------------------------------------------------------
+
+<<<FILE CONTENTS BEGIN>>>
+{content}
+<<<FILE CONTENTS END>>>

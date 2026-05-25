@@ -1,0 +1,31 @@
+{
+  "_comment": "Repo-specific config for the LLM summarizer. Same shape in every repo.",
+  "include_extensions": [".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".py"],
+  "exclude_files": [
+    "**/*.min.js",
+    "**/*.bundle.js",
+    "**/*.test.js",
+    "**/*.spec.js",
+    "**/*.d.ts"
+  ],
+  "exclude_dirs": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "masterdata",
+    "releases",
+    "dev_plans",
+    "skills",
+    "logs",
+    "tmp"
+  ],
+  "max_input_bytes": 60000,
+  "max_files_per_run": 0,
+  "provider": "agy",
+  "model": "Gemini 3.5 Flash (Low)",
+  "agy_timeout_sec": 300,
+  "gemini_timeout_sec": 120
+}

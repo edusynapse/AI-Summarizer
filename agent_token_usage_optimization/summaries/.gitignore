@@ -1,0 +1,2 @@
+# intentionally empty — summaries/repo/ and manifest.json are committed
+# so teammates inherit the cache and don't re-summarize on checkout.

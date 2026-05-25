@@ -1,0 +1,19 @@
+{
+  "include": [
+    "**/*.js", "**/*.mjs", "**/*.cjs",
+    "**/*.ts", "**/*.tsx",
+    "**/*.py"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/*.min.js",
+    "**/masterdata/**",
+    "**/skills/agent_token_usage_optimization/repo/**"
+  ],
+  "summary_max_files": 200
+}
