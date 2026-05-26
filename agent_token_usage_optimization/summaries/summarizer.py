@@ -120,10 +120,17 @@ def read_prompt_template():
 
 
 def call_gemini(prompt, model, timeout):
-    res = subprocess.run(
-        ["gemini", "--model", model, "-p", prompt],
-        capture_output=True, text=True, timeout=timeout,
-    )
+    if len(prompt.encode("utf-8")) > 60000:
+        res = subprocess.run(
+            ["gemini", "--model", model],
+            input=prompt,
+            capture_output=True, text=True, timeout=timeout,
+        )
+    else:
+        res = subprocess.run(
+            ["gemini", "--model", model, "-p", prompt],
+            capture_output=True, text=True, timeout=timeout,
+        )
     if res.returncode != 0:
         raise RuntimeError(f"gemini exit={res.returncode}: {res.stderr[:400].strip()}")
     out = (res.stdout or "").strip()
