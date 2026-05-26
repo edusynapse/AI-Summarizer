@@ -13,9 +13,9 @@
 # the starter README) are NEVER overwritten if they already exist — only
 # created on first install.
 #
-# Generated artifacts (repo/index.sqlite, repo/summaries/, summaries/manifest.json,
-# summaries/repo/, summaries/rollups/, summaries/rollups_manifest.json) are
-# never touched.
+# Generated artifacts are never overwritten. `repo/index.sqlite` is intended to
+# be tracked after `broker.py index`; Python bytecode stays ignored by the
+# target repo's root .gitignore.
 
 set -euo pipefail
 
@@ -142,6 +142,8 @@ echo "  fill  skills/agent_token_usage_optimization/summaries/repo_context/*.md"
 echo "  run   python3 skills/agent_token_usage_optimization/broker.py index"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py"
+echo "  track skills/agent_token_usage_optimization/repo/index.sqlite if you commit the broker index"
+echo "  ignore __pycache__/ and *.py[cod] in the target repo root .gitignore"
 echo
 echo "instruction profile: loose (default)"
 echo "  switch with: $(cd "$(dirname "$0")" && pwd)/switch-agent-type.sh low  $TARGET"

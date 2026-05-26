@@ -17,7 +17,7 @@ agent_token_usage_optimization/
 │   └── summarize.py
 └── repo/               ← REPO-SPECIFIC. Same shape in every repo, unique content.
     ├── config.json     ← include/exclude globs, language hints
-    ├── index.sqlite    ← symbol → file:line index (generated)
+    ├── index.sqlite    ← symbol → file:line index (generated, commit if desired)
     ├── summaries/      ← file-hash → summary cache (generated)
     └── SUMMARY.md      ← human-readable repo overview (generated, hand-editable)
 ```
@@ -57,6 +57,11 @@ python3 skills/agent_token_usage_optimization/broker.py index
 
 Re-run `broker.py index` after large refactors, or wire into a git post-commit
 hook.
+
+If you want agents to have symbol search immediately after checkout, commit
+`skills/agent_token_usage_optimization/repo/index.sqlite` after rebuilding it.
+Keep Python bytecode ignored (`__pycache__/`, `*.py[cod]`); it is
+runtime cache, not an index artifact.
 
 ## Refreshing LLM summaries
 
