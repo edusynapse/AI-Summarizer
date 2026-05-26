@@ -38,7 +38,7 @@ if [[ ! -d "$SRC_DIR" ]]; then
   exit 1
 fi
 
-mkdir -p "$DST_DIR/lib" "$DST_DIR/repo" "$DST_DIR/summaries/repo_context"
+mkdir -p "$DST_DIR/lib" "$DST_DIR/repo" "$DST_DIR/summaries/repo_context" "$DST_DIR/templates"
 
 # --- always overwrite (shared) ---
 copy_shared() {
@@ -63,6 +63,8 @@ copy_shared "summaries/summarizer.py"
 copy_shared "summaries/rollup_summarizer.py"
 copy_shared "summaries/.gitignore"
 copy_shared "summaries/repo_context/README.md"
+copy_shared "templates/loose.md"
+copy_shared "templates/strict.md"
 
 # --- never overwrite if present (per-repo) ---
 copy_template() {
@@ -81,6 +83,54 @@ copy_template "summaries/rollups_config.json"
 
 chmod +x "$DST_DIR/broker.py" "$DST_DIR/indexer.py" "$DST_DIR/summaries/summarizer.py" "$DST_DIR/summaries/rollup_summarizer.py" || true
 
+# --- agent instruction files (CLAUDE.md + AGENTS.md) ---
+# Both are auto-loaded by their respective runtimes into every session in the
+# target repo (CLAUDE.md → Claude Code & Antigravity-on-Claude;
+# AGENTS.md → Codex, Antigravity, Cursor, Aider). Install uses the LOOSE
+# profile by default; flip a repo with switch-agent-type.sh.
+TEMPLATE="$SRC_DIR/templates/loose.md"
+BEGIN_MARK="<!-- BEGIN agent_token_usage_optimization -->"
+END_MARK="<!-- END agent_token_usage_optimization -->"
+
+install_instruction_file() {
+  local f="$1"
+  if [[ ! -f "$f" ]]; then
+    cp "$TEMPLATE" "$f"
+    echo "created: $f [profile=loose]"
+    return
+  fi
+  if grep -qF "$BEGIN_MARK" "$f"; then
+    local tmp; tmp="$(mktemp)"
+    awk -v begin="$BEGIN_MARK" -v end="$END_MARK" -v tpl="$TEMPLATE" '
+      BEGIN { skip=0 }
+      index($0, begin) { skip=1;
+        while ((getline line < tpl) > 0) print line;
+        close(tpl); next }
+      index($0, end)   { skip=0; next }
+      !skip { print }
+    ' "$f" > "$tmp" && mv "$tmp" "$f"
+    echo "refreshed block in: $f [profile=loose]"
+    return
+  fi
+  echo "warning: $f exists and has no agent_token_usage_optimization block."
+  if [[ -t 0 ]]; then
+    printf "  choose: [a]ppend block / [o]verwrite file / [s]kip (default s): "
+    read -r choice
+  else
+    choice="s"
+    echo "  (non-interactive shell — defaulting to skip)"
+  fi
+  case "${choice,,}" in
+    a|append)    { echo; cat "$TEMPLATE"; } >> "$f"; echo "  appended block to: $f" ;;
+    o|overwrite) cp "$TEMPLATE" "$f";                echo "  overwrote: $f" ;;
+    *)                                                echo "  skipped: $f (left untouched)" ;;
+  esac
+}
+
+echo
+install_instruction_file "$TARGET/CLAUDE.md"
+install_instruction_file "$TARGET/AGENTS.md"
+
 echo
 echo "installed → $DST_DIR"
 echo
@@ -92,3 +142,7 @@ echo "  fill  skills/agent_token_usage_optimization/summaries/repo_context/*.md"
 echo "  run   python3 skills/agent_token_usage_optimization/broker.py index"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py"
+echo
+echo "instruction profile: loose (default)"
+echo "  switch with: $(cd "$(dirname "$0")" && pwd)/switch-agent-type.sh low  $TARGET"
+echo "  check  with: $(cd "$(dirname "$0")" && pwd)/switch-agent-type.sh check $TARGET"

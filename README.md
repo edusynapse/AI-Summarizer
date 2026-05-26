@@ -31,8 +31,12 @@ Full architecture rationale is in `agent_token_usage_optimization/README.md`.
 AI-Summarizer/
 ├── README.md                              ← you are here
 ├── install.sh                             ← copy skill into a target repo
+├── switch-agent-type.sh                   ← switch a repo between high/low profile
 └── agent_token_usage_optimization/        ← the skill (drop-in to any repo)
     ├── README.md
+    ├── templates/                         ← shared — drive CLAUDE.md / AGENTS.md
+    │   ├── loose.md                       ← high-model profile (default)
+    │   └── strict.md                      ← low-model profile
     ├── broker.py                          ← shared
     ├── indexer.py                         ← shared
     ├── lib/                               ← shared
@@ -72,6 +76,72 @@ First run: drops the full tree into `<target_repo>/skills/agent_token_usage_opti
 
 Subsequent runs: overwrite shared files only. Per-repo configs and curated
 `repo_context/` content are preserved.
+
+### Agent instruction files: `CLAUDE.md` + `AGENTS.md`
+
+The installer drops **two** files at the **target repo root** (not inside
+`skills/`):
+
+| File | Read by |
+|---|---|
+| `CLAUDE.md` | Claude Code; Antigravity when its agent is on a Claude model |
+| `AGENTS.md` | Codex (VSCode + CLI); Antigravity (all models); Cursor; Aider |
+
+Both are written from the **same template body** for full compatibility —
+no per-file content drift. The runtimes auto-load these into the system
+prompt at session start, so the "summaries-first, broker-for-symbols,
+source-last" workflow applies without restating it.
+
+#### Two profiles: loose (default) vs. strict
+
+Static instruction files can't be model-aware at runtime (no runtime
+exposes "the current model" to file loading). So the strategy is two
+profiles, swapped per repo by a separate script:
+
+| Profile | When to use | Body |
+|---|---|---|
+| **loose** (default) | High-capability models (Opus, Sonnet 4.6+, GPT-5, o-series, Gemini 2.5 Pro) | Suggested workflow, broker commands, "use judgment" |
+| **strict** | Low-cost / smaller models (Haiku, GPT-4.1-mini, Gemini Flash) where wriggle room hurts more than it helps; or high-stakes repos where the workflow must be followed verbatim | Numbered required steps, hard "DO NOT" rules, stale-summary fallback |
+
+`install.sh` writes the **loose** profile by default. Flip a repo with:
+
+```bash
+./switch-agent-type.sh low   /path/to/repo    # → strict
+./switch-agent-type.sh high  /path/to/repo    # → loose
+./switch-agent-type.sh check /path/to/repo    # report current profile + strays
+./switch-agent-type.sh low   /path/to/repo --force   # bypass "custom file" prompt
+```
+
+`check` also scans the tree for stray `AGENTS*.md` / `CLAUDE*.md` files
+in subdirectories — these are also read by some agents (notably Codex,
+which walks from project root down to cwd), so they're worth knowing
+about.
+
+> **Heads up:** Instruction files are loaded once at session start, not
+> per turn. After switching profile, **open a new conversation /
+> session** in your IDE — current sessions stay on the old profile until
+> they end. No IDE restart needed.
+
+#### Template marker block
+
+Template content is delimited by HTML markers so it can coexist with a
+human-authored `CLAUDE.md` / `AGENTS.md`:
+
+```markdown
+<!-- BEGIN agent_token_usage_optimization -->
+... skill guidance ...
+<!-- END agent_token_usage_optimization -->
+```
+
+Install-time and switch-time behavior applies independently to each of
+`CLAUDE.md` and `AGENTS.md`:
+
+| Target state | Behavior |
+|---|---|
+| File missing | Create it from the active profile template. |
+| File **with** the marker block | Refresh just the block in place — surrounding content untouched. This makes re-running `install.sh` / `switch-agent-type.sh` safe and idempotent. |
+| File **without** the block, interactive shell | Warn + prompt: `[a]ppend` (add block at end) / `[o]verwrite` (replace whole file) / `[s]kip` (default). |
+| File **without** the block, non-interactive shell | Warn + skip — no file modified. CI-safe. Pass `--force` (switch script only) to overwrite anyway. |
 
 After install, in the target repo:
 
