@@ -13,11 +13,17 @@ summaries/
 ├── summarizer.py         SHARED: incremental update script
 ├── manifest.json         GENERATED: path → sha1 hash of last summarized version
 ├── repo/                 GENERATED: mirrors source tree, one `<path>.md` per file
+├── rollups_config.json   REPO-SPECIFIC: include-list for directory rollups
+├── rollup_prompt_template.txt SHARED: prompt for directory rollups
+├── rollup_summarizer.py  SHARED: builds rollups from existing file summaries
+├── rollups_manifest.json GENERATED: input digest per rollup
+├── rollups/              GENERATED: directory-level routing summaries
 └── repo_context/         HAND-CURATED: high-level agent orientation (see its README)
 ```
 
 Shared files are identical in every repo. `config.json`, `manifest.json`,
-`repo/`, and `repo_context/` are repo-specific.
+`repo/`, `rollups_config.json`, `rollups_manifest.json`, `rollups/`, and
+`repo_context/` are repo-specific.
 
 ## Usage
 
@@ -53,6 +59,37 @@ Incremental behavior:
 
 Failures don't update the hash → next run retries.
 
+## Directory rollups
+
+Rollups summarize large directories from the existing per-file summaries. They
+do not read source files. Use them as the routing layer between `repo_context/`
+and individual file summaries.
+
+Edit `rollups_config.json`:
+
+```json
+{
+  "include_dirs": ["lib/helpers", "lib/widgets", "libadmin"]
+}
+```
+
+Then run:
+
+```bash
+python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --dry-run
+python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
+
+# One-off or scoped rollups:
+python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --dir lib/helpers
+python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py \
+  --dir libadmin --provider agy --model "Gemini 3.5 Flash (Low)" --timeout 300
+```
+
+Rollups are hash-based. `rollups_manifest.json` records the digest of all input
+file-summary markdown for each directory plus prompt/settings. If no underlying
+file summaries changed, the rollup is skipped. Use `--force` when you want to
+regenerate despite unchanged inputs.
+
 ## Gotchas
 
 - Default backend is `agy` with model display name `Gemini 3.5 Flash (Low)`.
@@ -62,6 +99,8 @@ Failures don't update the hash → next run retries.
   with the prompt on stdin, then restores the previous model. Do not run two
   `agy` summarizer jobs in parallel under the same OS user.
 - Gemini is still available with `--provider gemini --model gemini-3-flash-preview`.
+- `rollup_summarizer.py` uses the same provider/model settings and AGY caveats
+  as `summarizer.py`.
 - Files over `max_input_bytes` (default 60KB) are truncated. Very large
   files would need chunked summarization — not implemented in this cut.
 - The prompt template is intentionally strict. If you change it, the

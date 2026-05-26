@@ -1,0 +1,45 @@
+You are creating a directory-level rollup for an automated code-search index.
+Your input is a set of per-file summaries that already follow a terse markdown
+format. Do not open source files. Do not invent details not supported by the
+input summaries.
+
+Audience: AI coding agents deciding where to look before spending tokens on
+full source files.
+
+Directory: {dir}
+File summary count: {count}
+
+OUTPUT FORMAT — emit EXACTLY these sections, in this order, as plain markdown.
+No preamble. No closing remarks. No code fences around the whole response.
+Total response under {max_words} words.
+
+## PURPOSE
+One short paragraph: what this directory owns in the system.
+
+## WHEN TO START HERE
+Bullet list, max 6 items. Decision rules: "Start here when..."
+
+## MAIN AREAS
+Bullet list, max 10 items. Group related files/concepts and name representative files.
+
+## IMPORTANT FILES
+Bullet list, max {max_files} items. Format:
+- `path` — why an agent would open it.
+
+## CROSS-CUTTING GOTCHAS
+Bullet list, max 8 items. Only non-obvious contracts, invariants, platform/session/security/performance concerns, or repeated risks. If none, write `none`.
+
+## SEARCH TERMS
+Comma-separated domain terms and identifiers useful for semantic/rg search. Max 20.
+
+HARD RULES:
+- This is a routing summary, not documentation.
+- Prefer specific file paths and system vocabulary over generic prose.
+- Do not list every file.
+- Do not repeat the same point across sections.
+- If input summaries conflict or are thin, say what is uncertain.
+
+------------------------------------------------------------
+PER-FILE SUMMARIES BEGIN
+{summaries}
+PER-FILE SUMMARIES END

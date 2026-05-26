@@ -10,14 +10,18 @@ Improvements land here first, then propagate via `install.sh`.
 
 ## What's in the skill
 
-Two layers, each independently useful:
+Three layers, each independently useful:
 
 1. **Context Broker (`broker.py`)** — CLI tools that any agent can shell out
    to: `search / outline / read --symbol / diff / summary / context`. Cuts
    per-task token spend by 60–90% vs. pasting whole files.
-2. **LLM Summary Cache (`summaries/`)** — `gemini-3-flash-preview`-generated,
-   hash-keyed, incremental file summaries. Lets agents decide *whether* to
-   open a file from a 200-token summary instead of reading 5k tokens.
+2. **LLM Summary Cache (`summaries/`)** — provider-backed, hash-keyed,
+   incremental file summaries. Lets agents decide *whether* to open a file
+   from a 200-token summary instead of reading 5k tokens.
+3. **Directory Rollups (`summaries/rollups/`)** — optional hash-keyed
+   summaries of selected large directories, generated from existing file
+   summaries. Helps agents choose an area before reading dozens of per-file
+   summaries.
 
 Full architecture rationale is in `agent_token_usage_optimization/README.md`.
 
@@ -42,15 +46,19 @@ AI-Summarizer/
     └── summaries/
         ├── README.md                      ← shared
         ├── summarizer.py                  ← shared
+        ├── rollup_summarizer.py           ← shared
         ├── prompt_template.txt            ← shared
+        ├── rollup_prompt_template.txt     ← shared
         ├── config.json                    ← TEMPLATE — edit per repo
+        ├── rollups_config.json            ← TEMPLATE — edit per repo
         ├── .gitignore                     ← shared
         └── repo_context/                  ← per-repo, hand-curated
             └── README.md                  ← shared starter
 ```
 
 **Shared** files are byte-identical across every repo and are overwritten by
-`install.sh`. **Per-repo** files (`config.json` in two places,
+`install.sh`. **Per-repo** files (`config.json` in `repo/`,
+`summaries/config.json`, `summaries/rollups_config.json`, and
 `repo_context/*.md` beyond the README) are NEVER overwritten — see
 `install.sh` for the exact rule.
 
@@ -71,6 +79,7 @@ After install, in the target repo:
 # 1. customize include/exclude rules
 $EDITOR skills/agent_token_usage_optimization/repo/config.json
 $EDITOR skills/agent_token_usage_optimization/summaries/config.json
+$EDITOR skills/agent_token_usage_optimization/summaries/rollups_config.json
 
 # 2. populate orientation (see repo_context/README.md for suggested files)
 $EDITOR skills/agent_token_usage_optimization/summaries/repo_context/00_what_this_repo_is.md
@@ -78,8 +87,11 @@ $EDITOR skills/agent_token_usage_optimization/summaries/repo_context/00_what_thi
 # 3. build the symbol index
 python3 skills/agent_token_usage_optimization/broker.py index
 
-# 4. backfill LLM summaries (one-time, ~$1-3 in Gemini Flash usage)
+# 4. backfill LLM summaries
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py
+
+# 5. build selected directory rollups from existing file summaries
+python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 ```
 
 ## Improvement workflow

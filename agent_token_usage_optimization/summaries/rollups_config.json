@@ -1,0 +1,9 @@
+{
+  "_comment": "Repo-specific directory rollups. Edit include_dirs for high-value large directories only.",
+  "include_dirs": [],
+  "exclude_summary_files": [],
+  "max_input_bytes": 120000,
+  "max_words": 700,
+  "max_important_files": 14,
+  "max_rollups_per_run": 0
+}
