@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Context Broker — single CLI entry point for agent retrieval.
+"""Context Broker — symbol + source retrieval (companion to summary_broker.py).
+
+Recommended: Start with summary_broker.py (summary layer first).
+Fall back to this tool when you need symbols or raw code slices.
 
 Usage:
   broker.py index
@@ -7,10 +10,10 @@ Usage:
   broker.py outline <file>
   broker.py read <file> [--symbol NAME] [--lines A-B]
   broker.py diff [REV]
-  broker.py summary [<file>]    # prefers LLM summary, falls back to regex
-  broker.py context [<file>] [--list]   # hand-curated repo orientation
+  broker.py summary [<file>]
+  broker.py context [<file>] [--list]
 
-All output is plain text. Designed to be called by any coding agent.
+See also: summary_broker.py search / hotspots / grep (the new summary-first tool)
 """
 import os
 import sys

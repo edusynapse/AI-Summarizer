@@ -3,65 +3,89 @@
 Agent-agnostic retrieval layer. Any coding agent (Claude, Codex, Antigravity,
 Cursor, ...) calls these CLI tools instead of pasting whole files into context.
 
+**Core principle:** Search the LLM summary layer first. Touch source only when necessary.
+
 ## Layout
 
 ```
 agent_token_usage_optimization/
-├── README.md           ← you are here
-├── broker.py           ← single CLI entry point (search/outline/read/diff/index/summary)
-├── indexer.py          ← (re)builds the repo index
-├── lib/                ← shared helpers, identical across all repos
-│   ├── languages.py
-│   ├── outline.py
-│   ├── search.py
-│   └── summarize.py
-└── repo/               ← REPO-SPECIFIC. Same shape in every repo, unique content.
-    ├── config.json     ← include/exclude globs, language hints
-    ├── index.sqlite    ← symbol → file:line index (generated, commit if desired)
-    ├── summaries/      ← file-hash → summary cache (generated)
-    └── SUMMARY.md      ← human-readable repo overview (generated, hand-editable)
+├── README.md              ← you are here
+├── broker.py              ← original broker (symbols + source content)
+├── summary_broker.py      ← NEW: summary-layer-first broker (recommended starting point)
+├── indexer.py
+├── lib/
+│   ├── ...
+│   └── summary_search.py  ← NEW: reusable summary search engine
+└── repo/
+    ├── ...
+    ├── summaries/         ← the rich semantic layer (LLM-generated .md files + rollups)
+    └── repo_context/      ← hand-curated high-level orientation
 ```
 
-Top-level files are the **same in every repo**. The `repo/` subdir holds the
-**repo-specific** artifacts (same shape, different content).
-
-## How agents should use it
-
-Instead of reading 5 whole files (~20k tokens), the agent calls:
+## Recommended Agent Workflow (2026+)
 
 ```bash
-python3 skills/agent_token_usage_optimization/broker.py search "createPlaySession"
-# → ranked list:  path:line  one-line snippet
+# 1. ALWAYS start here (summary layer)
+python3 skills/agent_token_usage_optimization/summary_broker.py search "reindexAll OR 'full scan' OR scaling" --dir models
 
-python3 .../broker.py outline models/crossword/crossworddatamodel.js
-# → all symbols + signatures only (~5% of file size)
+python3 .../summary_broker.py hotspots scaling
+python3 .../summary_broker.py grep "performance scales|in-app after"
 
-python3 .../broker.py read models/crossword/crossworddatamodel.js --symbol upsertCrosswordMaster
-# → just that function, not the whole file
+# 2. Read a specific high-value summary (no source code)
+python3 .../summary_broker.py read models/playedgamebyusermodel.js
+python3 .../summary_broker.py rollup models
 
-python3 .../broker.py diff
-# → minified unstaged diff (hunks only, no unchanged context spam)
-
-python3 .../broker.py summary
-# → repo-level overview from repo/SUMMARY.md
+# 3. Only when you need symbols or actual code:
+python3 .../broker.py search "createPlaySession"
+python3 .../broker.py read models/foo.js --symbol someFunction
 ```
+
+The `summary_broker.py` tool was created specifically because the original `broker.py search` only searched source + the symbol index. It ignored the far richer LLM summaries that the rest of the skill generates.
+
+## New Tool: summary_broker.py
+
+Dedicated companion focused on the LLM summary layer:
+
+```bash
+# Keyword search with smart scoring (rollups + GOTCHAS sections rank higher)
+summary_broker.py search "reindexAll OR 'key scan'" --dir models --max 25
+
+# Regex across every generated summary
+summary_broker.py grep "in-app after|scales with record count"
+
+# Heuristic risk scanner (extremely useful for audits)
+summary_broker.py hotspots scaling
+summary_broker.py hotspots maintenance
+
+# Convenience accessors
+summary_broker.py read models/usermodel.js
+summary_broker.py rollup models
+summary_broker.py list models
+```
+
+See `summary_broker.py --help` for the full set of commands.
 
 ## Setup per repo
 
 ```bash
 # 1. drop this folder into <repo>/skills/agent_token_usage_optimization/
-# 2. customize repo/config.json (include/exclude globs)
-# 3. build the index:
+# 2. customize the two config files
+$EDITOR skills/agent_token_usage_optimization/repo/config.json
+$EDITOR skills/agent_token_usage_optimization/summaries/config.json
+$EDITOR skills/agent_token_usage_optimization/summaries/rollups_config.json
+
+# 3. Build the symbol index (still useful)
 python3 skills/agent_token_usage_optimization/broker.py index
+
+# 4. Generate the LLM summary layer (the real power)
+python3 skills/agent_token_usage_optimization/summaries/summarizer.py
+python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 ```
 
-Re-run `broker.py index` after large refactors, or wire into a git post-commit
-hook.
+Re-run the index + summarizers after large refactors.
 
-If you want agents to have symbol search immediately after checkout, commit
-`skills/agent_token_usage_optimization/repo/index.sqlite` after rebuilding it.
-Keep Python bytecode ignored (`__pycache__/`, `*.py[cod]`); it is
-runtime cache, not an index artifact.
+Commit `repo/index.sqlite` if you want instant symbol search after clone.
+Python bytecode stays ignored.
 
 ## Refreshing LLM summaries
 
@@ -112,6 +136,15 @@ python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --d
 Rollups use existing `summaries/repo/**/*.md` content as input and write to
 `summaries/rollups/<dir>.md`. `rollups_manifest.json` stores the digest of the
 input summaries, so unchanged directories are skipped.
+
+## The Two Brokers (2026 model)
+
+| Tool                    | Primary Purpose                          | When to Use                                      | Searches Source? |
+|-------------------------|------------------------------------------|--------------------------------------------------|------------------|
+| `summary_broker.py`     | **Summary layer first** (new)            | Almost everything. Audits, exploration, "does this have X risk?" | Never           |
+| `broker.py`             | Symbol index + targeted source reads     | When you need function signatures or a specific slice of code | Yes             |
+
+**Strong recommendation:** Wire agents to prefer `summary_broker.py` for the first 1–3 retrievals on any task.
 
 ## Why this works for any agent
 

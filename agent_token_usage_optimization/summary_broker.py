@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""
+Summary Broker — summary-layer-first retrieval for AI coding agents.
+
+This is the companion / alternate to broker.py focused on the LLM-generated
+summaries, rollups, and repo_context. Use this first (per AGENTS.md / CLAUDE.md)
+before falling back to broker.py for symbol-level source inspection.
+
+Usage examples:
+  python3 skills/.../summary_broker.py search "reindexAll OR 'full scan'" --dir models
+  python3 .../summary_broker.py grep "performance scales|in-app after"
+  python3 .../summary_broker.py rollup models
+  python3 .../summary_broker.py read models/usermodel.js
+  python3 .../summary_broker.py hotspots scaling
+"""
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+from lib import summary_search
+
+
+def find_repo_root() -> str:
+    """Best-effort repo root (directory containing the skill or .git)."""
+    p = Path(HERE).resolve()
+    for _ in range(8):
+        if (p / ".git").exists() or (p / "skills").exists():
+            return str(p)
+        if p.parent == p:
+            break
+        p = p.parent
+    return str(Path(HERE).resolve().parents[2])  # rough fallback
+
+
+def cmd_search(args):
+    root = summary_search.find_summaries_root()
+    if not root:
+        print("(could not locate summaries/ directory)")
+        return
+
+    results = summary_search.search_summaries(
+        query=args.query,
+        summaries_root=root,
+        dir_filter=args.dir,
+        max_results=args.max,
+    )
+    print(summary_search.render_search_results(results))
+
+
+def cmd_grep(args):
+    root = summary_search.find_summaries_root()
+    if not root:
+        print("(could not locate summaries/ directory)")
+        return
+
+    results = summary_search.grep_summaries(
+        pattern=args.pattern,
+        summaries_root=root,
+        dir_filter=args.dir,
+        max_results=args.max,
+    )
+    print(summary_search.render_grep_results(results))
+
+
+def cmd_read(args):
+    root = summary_search.find_summaries_root()
+    if not root:
+        print("(could not locate summaries/ directory)")
+        return
+
+    target = args.target
+    # Accept both "models/foo.js" and "models/foo.js.md"
+    if not target.endswith(".md"):
+        target_md = target + ".md"
+    else:
+        target_md = target
+
+    candidates = [
+        os.path.join(root, "repo", target_md),
+        os.path.join(root, "repo", target),           # already has .md
+        os.path.join(root, target_md),
+        os.path.join(root, "rollups", target_md.replace("rollups/", "")),
+    ]
+
+    for cand in candidates:
+        if os.path.isfile(cand):
+            with open(cand, encoding="utf-8", errors="ignore") as f:
+                print(f.read())
+            print(f"\n(source: {cand})")
+            return
+
+    print(f"(summary not found for: {target})")
+    print(f"Looked under: {root}/repo/ and {root}/rollups/")
+
+
+def cmd_rollup(args):
+    root = summary_search.find_summaries_root()
+    if not root:
+        print("(could not locate summaries/ directory)")
+        return
+
+    rollups_dir = os.path.join(root, "rollups")
+    if not os.path.isdir(rollups_dir):
+        print("(no rollups/ directory yet — run rollup_summarizer.py)")
+        return
+
+    name = args.name
+    if not name.endswith(".md"):
+        name += ".md"
+
+    path = os.path.join(rollups_dir, name)
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            print(f.read())
+        return
+
+    # List available rollups
+    available = [f for f in os.listdir(rollups_dir) if f.endswith(".md")]
+    print(f"(rollup not found: {name})")
+    print("Available rollups:", ", ".join(sorted(available)) or "(none)")
+
+
+def cmd_list(args):
+    root = summary_search.find_summaries_root()
+    if not root:
+        print("(could not locate summaries/ directory)")
+        return
+
+    target_dir = args.dir or ""
+    base = os.path.join(root, "repo", target_dir)
+
+    if not os.path.isdir(base):
+        base = os.path.join(root, target_dir)
+
+    if not os.path.isdir(base):
+        print(f"(directory not found under summaries: {target_dir or 'repo/'})")
+        return
+
+    for dirpath, _, filenames in os.walk(base):
+        for fn in sorted(filenames):
+            if fn.endswith(".md"):
+                rel = os.path.relpath(os.path.join(dirpath, fn), root)
+                print(rel)
+
+
+def cmd_hotspots(args):
+    """Heuristic scan for common scaling / maintenance / risk patterns."""
+    root = summary_search.find_summaries_root()
+    if not root:
+        print("(could not locate summaries/ directory)")
+        return
+
+    category = (args.category or "all").lower()
+
+    patterns = {
+        "scaling": r"reindexAll|full scan|key scan|scales with|performance scales|in memory|SMEMBERS|large result|O\(n|slow at scale",
+        "security": r"PII|DEK|encryption|admin key|key rotation|scrub",
+        "maintenance": r"reindex|patchToLatest|model_version|migration",
+        "all": r"reindexAll|full scan|scales with|in-app after|SMEMBERS|large result|key scan",
+    }
+
+    pat = patterns.get(category, patterns["all"])
+
+    results = summary_search.grep_summaries(
+        pattern=pat,
+        summaries_root=root,
+        max_results=80,
+    )
+    print(f"=== Hotspots for category: {category} ===\n")
+    print(summary_search.render_grep_results(results))
+
+
+def main():
+    p = argparse.ArgumentParser(
+        prog="summary_broker",
+        description="Summary-layer-first retrieval (use before touching source code)."
+    )
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    # search (the primary new command)
+    s = sub.add_parser("search", help="Search LLM summaries + rollups (keyword)")
+    s.add_argument("query")
+    s.add_argument("--dir", help="scope to a subdirectory under summaries/repo/ (e.g. models, lib)")
+    s.add_argument("--max", type=int, default=40)
+    s.set_defaults(func=cmd_search)
+
+    # grep (regex)
+    g = sub.add_parser("grep", help="Regex search across all summaries")
+    g.add_argument("pattern")
+    g.add_argument("--dir")
+    g.add_argument("--max", type=int, default=60)
+    g.set_defaults(func=cmd_grep)
+
+    # read a specific summary file
+    r = sub.add_parser("read", help="Print a specific file summary or rollup")
+    r.add_argument("target", help="e.g. models/usermodel.js  or  rollups/models.md")
+    r.set_defaults(func=cmd_read)
+
+    # rollup convenience
+    ru = sub.add_parser("rollup", help="Print a directory rollup")
+    ru.add_argument("name", help="e.g. models or lib")
+    ru.set_defaults(func=cmd_rollup)
+
+    # list summaries
+    ls = sub.add_parser("list", help="List available summary files")
+    ls.add_argument("dir", nargs="?", help="optional subdirectory filter")
+    ls.set_defaults(func=cmd_list)
+
+    # hotspots (very useful for the exact use case that motivated this tool)
+    hs = sub.add_parser("hotspots", help="Heuristic search for risk patterns (scaling, maintenance, etc.)")
+    hs.add_argument("category", nargs="?", default="all",
+                    choices=["all", "scaling", "security", "maintenance"])
+    hs.add_argument("--max", type=int, default=50)
+    hs.set_defaults(func=cmd_hotspots)
+
+    args = p.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

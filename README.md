@@ -12,9 +12,10 @@ Improvements land here first, then propagate via `install.sh`.
 
 Three layers, each independently useful:
 
-1. **Context Broker (`broker.py`)** — CLI tools that any agent can shell out
-   to: `search / outline / read --symbol / diff / summary / context`. Cuts
-   per-task token spend by 60–90% vs. pasting whole files.
+1. **Context Broker** — Two complementary tools:
+   - `broker.py` — original symbol + source retrieval (`search`, `read --symbol`, `outline`…)
+   - `summary_broker.py` — **new summary-layer-first broker** (strongly preferred starting point)
+   Together they cut per-task token spend by 60–90%.
 2. **LLM Summary Cache (`summaries/`)** — provider-backed, hash-keyed,
    incremental file summaries. Lets agents decide *whether* to open a file
    from a 200-token summary instead of reading 5k tokens.
@@ -37,13 +38,15 @@ AI-Summarizer/
     ├── templates/                         ← shared — drive CLAUDE.md / AGENTS.md
     │   ├── loose.md                       ← high-model profile (default)
     │   └── strict.md                      ← low-model profile
-    ├── broker.py                          ← shared
+    ├── broker.py                          ← shared (original symbol/source broker)
+    ├── summary_broker.py                  ← NEW (summary-layer-first broker — use first)
     ├── indexer.py                         ← shared
     ├── lib/                               ← shared
     │   ├── languages.py
     │   ├── outline.py
     │   ├── search.py
-    │   └── summarize.py
+    │   ├── summarize.py
+    │   └── summary_search.py              ← NEW (powers summary_broker.py)
     ├── repo/                              ← per-repo (template + generated)
     │   ├── config.json                    ← TEMPLATE — edit per repo
     │   ├── index.sqlite                   ← GENERATED — commit after broker.py index
@@ -160,32 +163,35 @@ $EDITOR skills/agent_token_usage_optimization/summaries/rollups_config.json
 # 2. populate orientation (see repo_context/README.md for suggested files)
 $EDITOR skills/agent_token_usage_optimization/summaries/repo_context/00_what_this_repo_is.md
 
-# 3. build the symbol index
+# 3. build the symbol index (optional but useful)
 python3 skills/agent_token_usage_optimization/broker.py index
 
-# 4. backfill LLM summaries
+# 4. backfill LLM summaries (the foundation for summary_broker.py)
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py
-
-# 5. build selected directory rollups from existing file summaries
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
+
+# Agents now have both brokers available:
+#   summary_broker.py search ...     ← start here
+#   broker.py search ...             ← when you need symbols
 ```
 
 ## Improvement workflow
 
-1. Edit the shared files **here**, in this repo.
+1. Edit the shared files **here**, in this repo (especially `summary_broker.py` + `lib/summary_search.py`).
 2. Test in one product repo (copy or symlink during iteration).
 3. When stable, commit here.
 4. Run `./install.sh <repo>` against each consuming repo to propagate.
+
+Because `summary_broker.py` only reads the already-generated `summaries/` tree, it requires no changes to the summarizer pipeline.
 
 Per-repo customization (configs, orientation files) stays in the consuming
 repos — never push it back here.
 
 ## Roadmap
 
+- **Done:** `summary_broker.py` + `lib/summary_search.py` (summary-layer-first retrieval)
 - Layer 2: tiered context manager (pinned vs. working vs. cold).
 - Layer 3: log/diff minifier.
-- Optional MCP wrapper around `broker.py` for agents that prefer MCP over
-  shell.
+- Optional MCP wrapper around both brokers.
 - Tree-sitter outline (replace regex `lib/outline.py` for higher accuracy).
-- Embeddings-backed semantic search (FAISS, when lexical search starts to
-  miss).
+- Embeddings-backed semantic search over the summary corpus (future).
