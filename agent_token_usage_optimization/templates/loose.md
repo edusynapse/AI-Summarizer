@@ -24,12 +24,21 @@ python3 skills/agent_token_usage_optimization/broker.py summary <path>
 To reduce high-tier model token usage, offload simple context-gathering or localized editing tasks to a low-cost model using `low_tier_agent.py`:
 - Locate symbol line numbers:
   `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-symbol --file <file> --query "<name>"`
+- Find text anchors (drift-resistant alternative to line numbers):
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-anchor --file <file> --query "<name>"`
 - Propose edits for a line range:
   `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action suggest-edit --file <file> --start-line <num> --end-line <num> --instruction "<text>"`
 - Fix lint/compiler errors:
   `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect-errors --file <file> --error "<message>"`
+- Search the repo with a fast sub-agent (Composer 2.5) instead of grepping yourself:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action search --query "<what you're looking for>"`
+  Spawns a grok thread (`grok-composer-2.5-fast`) with read-only tools (grep/read_file/list_dir) that browses the repo and returns structured JSON `{found, summary, results:[{file,start_line,end_line,symbol,why}]}`. Add `--search-root <dir>` to scope it; `--file <dir>` as a focus hint.
 - Use Grok instead of Antigravity (optional):
-  Add `--provider grok` to any command above (uses `grok-build` model by default).
+  Add `--provider grok` to any command above.
+  - **Composer (`grok-composer-2.5-fast`, the default)** — use for searching, locating, triangulating across code by reading it, and quick piece-by-piece edits. It's the right choice whenever the required output complexity is low (faster, and more faithful at reproducing verbatim edit ranges).
+  - **`--model grok-build`** — reach for it only on heavy troubleshooting: reasoning across log files, hunting bugs, or multi-file investigation that needs sustained analysis.
+
+**Validation**: `suggest-edit` and `inspect-errors` responses include `_validation_warnings` if drift or line-count mismatches are detected. Check this field before blindly applying edits.
 
 Use your judgment — skip any step that doesn't help on the task at hand.
 <!-- END agent_token_usage_optimization -->
