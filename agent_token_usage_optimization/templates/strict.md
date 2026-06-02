@@ -21,6 +21,18 @@ python3 skills/agent_token_usage_optimization/broker.py outline <path>
 python3 skills/agent_token_usage_optimization/broker.py summary <path>
 ```
 
+## Offload Context & Edits to Low-Tier Model
+
+You MUST offload simple context-gathering or localized editing tasks to a low-cost model using `low_tier_agent.py`:
+- Locate symbol line numbers:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-symbol --file <file> --query "<name>"`
+- Propose edits for a line range:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action suggest-edit --file <file> --start-line <num> --end-line <num> --instruction "<text>"`
+- Fix lint/compiler errors:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect-errors --file <file> --error "<message>"`
+- Use Grok instead of Antigravity (optional):
+  Add `--provider grok` to any command above (uses `grok-build` model by default).
+
 ## Hard rules — do not violate
 
 - DO NOT read broad source directories (`src/`, `lib/`, etc.) directly. Always go through summaries first.
@@ -28,6 +40,7 @@ python3 skills/agent_token_usage_optimization/broker.py summary <path>
 - DO NOT Read a full source file when `broker.py outline` or `broker.py summary` would suffice.
 - DO NOT skip step 1, even when the task seems familiar.
 - DO NOT silently ignore this workflow because you "know" the answer — verify against summaries first.
+- DO NOT locate functions/classes manually or propose multi-line block changes on high models if `low_tier_agent.py` can perform them.
 
 ## When summaries are stale or missing
 

@@ -51,6 +51,7 @@ copy_shared "README.md"
 copy_shared "broker.py"
 copy_shared "indexer.py"
 copy_shared "summary_broker.py"
+copy_shared "low_tier_agent.py"
 copy_shared "lib/__init__.py"
 copy_shared "lib/languages.py"
 copy_shared "lib/outline.py"
@@ -83,7 +84,7 @@ copy_template "repo/config.json"
 copy_template "summaries/config.json"
 copy_template "summaries/rollups_config.json"
 
-chmod +x "$DST_DIR/broker.py" "$DST_DIR/indexer.py" "$DST_DIR/summary_broker.py" "$DST_DIR/summaries/summarizer.py" "$DST_DIR/summaries/rollup_summarizer.py" || true
+chmod +x "$DST_DIR/broker.py" "$DST_DIR/indexer.py" "$DST_DIR/summary_broker.py" "$DST_DIR/low_tier_agent.py" "$DST_DIR/summaries/summarizer.py" "$DST_DIR/summaries/rollup_summarizer.py" || true
 
 # --- agent instruction files (CLAUDE.md + AGENTS.md) ---
 # Both are auto-loaded by their respective runtimes into every session in the

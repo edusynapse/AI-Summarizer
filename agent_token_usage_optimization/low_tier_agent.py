@@ -1,0 +1,459 @@
+#!/usr/bin/env python3
+"""Low-tier LLM Agent helper script.
+
+Provides common context-gathering and localized editing capabilities
+by executing tasks against a low-cost, fast model via the agy or grok
+CLI tools.
+
+Providers:
+  agy  — Antigravity CLI, uses Gemini 3.5 Flash (Low) by default.
+  grok — Grok CLI, uses grok-build model by default.
+"""
+import os
+import sys
+import re
+import json
+import subprocess
+import argparse
+import fcntl
+
+AGY_SETTINGS_PATH = os.environ.get(
+    "AGY_SETTINGS_PATH",
+    os.path.expanduser("~/.gemini/antigravity-cli/settings.json"),
+)
+LOCK_FILE = os.path.expanduser("~/.gemini/antigravity-cli/low_tier_agent.lock")
+
+DEFAULT_AGY_MODEL = "Gemini 3.5 Flash (Low)"
+DEFAULT_GROK_MODEL = "grok-build"
+
+AGY_HEADLESS_INSTRUCTION = (
+    "Do not use tools, do not write files, and do not explain. "
+    "Print only the requested JSON to stdout."
+)
+
+GROK_DISALLOWED_TOOLS = (
+    "run_terminal_cmd,search_replace,write,read_file,web_search,"
+    "web_fetch,list_dir,grep,open_page,Agent"
+)
+
+FIND_SYMBOL_PROMPT = """You are a precise developer assistant. Locate the start and end line numbers of the requested symbol in the provided code.
+The code lines are numbered in the format '<line_number>: <code_line>'.
+
+File Path: {path}
+Symbol/Query: {query}
+
+Code:
+{code}
+
+Respond ONLY with a JSON object in this format:
+{{
+  "found": true,
+  "start_line": 42,
+  "end_line": 85,
+  "exact_match": "exact line content or signature of the match"
+}}
+If the symbol is not found, respond with:
+{{
+  "found": false,
+  "start_line": null,
+  "end_line": null,
+  "exact_match": null
+}}
+"""
+
+SUGGEST_EDIT_PROMPT = """You are a precise developer assistant. Suggest code edits for the target line range according to the provided instructions.
+The code lines are numbered in the format '<line_number>: <code_line>'.
+
+File Path: {path}
+Start Line: {start_line}
+End Line: {end_line}
+Instruction: {instruction}
+
+Target Code Block:
+{code}
+
+Respond ONLY with a JSON object in this format:
+{{
+  "success": true,
+  "original_content": "the original content of the lines in the block to be replaced (exact match)",
+  "replacement_content": "the complete replacement content for that block (make the requested changes)"
+}}
+If the instruction cannot be applied or is invalid, respond with:
+{{
+  "success": false,
+  "original_content": null,
+  "replacement_content": null
+}}
+"""
+
+INSPECT_ERRORS_PROMPT = """You are a precise developer assistant. Inspect the compiler or test error output and locate the lines in the code that need to be modified, then suggest the fix.
+The code lines are numbered in the format '<line_number>: <code_line>'.
+
+File Path: {path}
+Error Output:
+{error}
+
+Code:
+{code}
+
+Respond ONLY with a JSON object in this format:
+{{
+  "success": true,
+  "suggested_fix": "description of the fix",
+  "original_content": "the original content of the lines in the block to be replaced (exact match)",
+  "replacement_content": "the complete replacement content for that block (make the requested changes)"
+}}
+If the error cannot be resolved or is not related to this file, respond with:
+{{
+  "success": false,
+  "suggested_fix": null,
+  "original_content": null,
+  "replacement_content": null
+}}
+"""
+
+
+def detect_lang(path):
+    ext = os.path.splitext(path)[1].lower()
+    mapping = {
+        ".js": "js", ".mjs": "js", ".cjs": "js", ".jsx": "js",
+        ".ts": "ts", ".tsx": "ts",
+        ".py": "py", ".dart": "dart", ".rs": "rust", ".go": "go", ".java": "java",
+    }
+    return mapping.get(ext, "unknown")
+
+
+def compress_code_with_line_numbers(content, language):
+    lines = content.splitlines()
+    n_lines = len(lines)
+    chars = list(content)
+    n_chars = len(chars)
+
+    char_to_line = []
+    current_line = 0
+    for c in chars:
+        char_to_line.append(current_line)
+        if c == '\n':
+            current_line += 1
+
+    is_comment = [False] * n_chars
+    idx = 0
+    in_string = None
+    escaped = False
+
+    while idx < n_chars:
+        c = chars[idx]
+        if in_string is not None:
+            if escaped:
+                escaped = False
+                idx += 1
+                continue
+            if c == '\\':
+                escaped = True
+                idx += 1
+                continue
+            if c == in_string:
+                in_string = None
+                idx += 1
+                continue
+            idx += 1
+            continue
+
+        if c == '"':
+            in_string = '"'
+            idx += 1
+            continue
+        if c == "'":
+            in_string = "'"
+            idx += 1
+            continue
+
+        if language == "py":
+            if c == '#':
+                while idx < n_chars and chars[idx] != '\n':
+                    is_comment[idx] = True
+                    idx += 1
+                continue
+        else:
+            if idx + 1 < n_chars and c == '/' and chars[idx + 1] == '/':
+                while idx < n_chars and chars[idx] != '\n':
+                    is_comment[idx] = True
+                    idx += 1
+                continue
+            if idx + 1 < n_chars and c == '/' and chars[idx + 1] == '*':
+                is_comment[idx] = True
+                is_comment[idx + 1] = True
+                idx += 2
+                while idx + 1 < n_chars and not (chars[idx] == '*' and chars[idx + 1] == '/'):
+                    is_comment[idx] = True
+                    idx += 1
+                if idx < n_chars:
+                    is_comment[idx] = True
+                if idx + 1 < n_chars:
+                    is_comment[idx + 1] = True
+                idx += 2
+                continue
+        idx += 1
+
+    line_contents = [[] for _ in range(n_lines)]
+    for idx, c in enumerate(chars):
+        line_idx = char_to_line[idx]
+        if line_idx < n_lines and not is_comment[idx]:
+            line_contents[line_idx].append(c)
+
+    processed_lines = []
+    for line_idx, char_list in enumerate(line_contents):
+        line_str = "".join(char_list).rstrip()
+        if line_str:
+            processed_lines.append((line_idx + 1, line_str))
+    return processed_lines
+
+
+def format_numbered_lines(numbered_lines):
+    return "\n".join(f"{line_num}: {line_content}" for line_num, line_content in numbered_lines)
+
+
+def read_agy_settings():
+    with open(AGY_SETTINGS_PATH) as f:
+        return json.load(f)
+
+
+def write_agy_settings(settings):
+    with open(AGY_SETTINGS_PATH, "w") as f:
+        json.dump(settings, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+
+def set_agy_model(model):
+    settings = read_agy_settings()
+    if settings.get("model") == model:
+        return None
+    snapshot = {
+        "had": "model" in settings,
+        "previous": settings.get("model"),
+    }
+    settings["model"] = model
+    write_agy_settings(settings)
+    return snapshot
+
+
+def restore_agy_model(snapshot):
+    if not snapshot:
+        return
+    try:
+        settings = read_agy_settings()
+        if snapshot["had"]:
+            settings["model"] = snapshot["previous"]
+        else:
+            settings.pop("model", None)
+        write_agy_settings(settings)
+    except Exception as e:
+        sys.stderr.write(f"Warning: failed to restore model settings: {e}\n")
+
+
+def call_agy(prompt, model, timeout):
+    full_prompt = f"{AGY_HEADLESS_INSTRUCTION}\n\n{prompt}"
+    snapshot = None
+    if model:
+        try:
+            snapshot = set_agy_model(model)
+        except Exception as e:
+            raise RuntimeError(f"agy cannot set model in {AGY_SETTINGS_PATH}: {e}")
+    try:
+        res = subprocess.run(
+            ["agy"],
+            input=full_prompt,
+            capture_output=True, text=True, timeout=timeout,
+        )
+    finally:
+        restore_agy_model(snapshot)
+    if res.returncode != 0:
+        raise RuntimeError(f"agy exit={res.returncode}: {res.stderr[:400].strip()}")
+    out = (res.stdout or "").strip()
+    if not out:
+        raise RuntimeError("agy returned empty output")
+    return out
+
+
+def clean_grok_output(raw):
+    """Strip grok CLI noise (timestamps, ERROR lines, markdown fences)."""
+    text = raw.strip()
+    lines = text.split("\n")
+    filtered = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # Skip grok stderr-like lines that leak into stdout
+        if re.match(r"^\d{4}-\d{2}-\d{2}T", stripped):
+            continue
+        if "ERROR" in stripped or "failed to watch" in stripped or "watch root" in stripped:
+            continue
+        filtered.append(line)
+    text = "\n".join(filtered).strip()
+    # Strip markdown code fences
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-z]*\r?\n?", "", text)
+        text = re.sub(r"```\s*$", "", text).strip()
+    return text
+
+
+def call_grok(prompt, model, timeout):
+    """Call the Grok CLI with tool-disabled headless flags."""
+    grok_model = model or DEFAULT_GROK_MODEL
+    full_prompt = f"{AGY_HEADLESS_INSTRUCTION}\n\n{prompt}"
+    args = [
+        "grok",
+        "-p", full_prompt,
+        "--output-format", "plain",
+        "--always-approve",
+        "--no-memory",
+        "--no-plan",
+        "--no-subagents",
+        "--no-alt-screen",
+        "--cwd", "/tmp",
+        "--disallowed-tools", GROK_DISALLOWED_TOOLS,
+    ]
+    res = subprocess.run(
+        args,
+        capture_output=True, text=True, timeout=timeout,
+        env={**os.environ},
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"grok exit={res.returncode}: {res.stderr[:400].strip()}")
+    out = clean_grok_output(res.stdout or "")
+    if not out:
+        raise RuntimeError("grok returned empty output")
+    return out
+
+
+def call_llm(prompt, provider, model, timeout):
+    """Dispatch to the configured provider."""
+    if provider == "agy":
+        return call_agy(prompt, model, timeout)
+    if provider == "grok":
+        return call_grok(prompt, model, timeout)
+    raise ValueError(f"unsupported provider: {provider}")
+
+
+def extract_json(text):
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    match = re.search(r"(\{.*\})", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError(f"Could not parse JSON from output: {text}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--action", required=True, choices=["find-symbol", "suggest-edit", "inspect-errors"])
+    parser.add_argument("--file", required=True, help="Target file path")
+    parser.add_argument("--query", help="Symbol name or search query (for find-symbol)")
+    parser.add_argument("--start-line", type=int, help="Start line number (for suggest-edit)")
+    parser.add_argument("--end-line", type=int, help="End line number (for suggest-edit)")
+    parser.add_argument("--instruction", help="Edit instruction description (for suggest-edit)")
+    parser.add_argument("--error", help="Error message output (for inspect-errors)")
+    parser.add_argument("--provider", choices=["agy", "grok"], default="agy",
+                        help="LLM provider: agy (Antigravity CLI) or grok (Grok CLI)")
+    parser.add_argument("--model", default=None,
+                        help="Model override (default: auto per provider — 'Gemini 3.5 Flash (Low)' for agy, 'grok-build' for grok)")
+    parser.add_argument("--timeout", type=int, default=120, help="Process timeout in seconds")
+
+    args = parser.parse_args()
+
+    # Resolve default model per provider if not explicitly set
+    if args.model is None:
+        args.model = DEFAULT_GROK_MODEL if args.provider == "grok" else DEFAULT_AGY_MODEL
+
+    if not os.path.exists(args.file):
+        sys.stderr.write(f"Error: file not found: {args.file}\n")
+        sys.exit(1)
+
+    try:
+        with open(args.file, "r", encoding="utf-8", errors="ignore") as f:
+            file_content = f.read()
+    except Exception as e:
+        sys.stderr.write(f"Error reading file {args.file}: {e}\n")
+        sys.exit(1)
+
+    lang = detect_lang(args.file)
+
+    # 1. Compile prompt based on action
+    if args.action == "find-symbol":
+        if not args.query:
+            sys.stderr.write("Error: --query is required for find-symbol action\n")
+            sys.exit(1)
+        # Compress and add line numbers
+        compressed = compress_code_with_line_numbers(file_content, lang)
+        formatted_code = format_numbered_lines(compressed)
+        prompt = FIND_SYMBOL_PROMPT.format(path=args.file, query=args.query, code=formatted_code)
+
+    elif args.action == "suggest-edit":
+        if args.start_line is None or args.end_line is None or not args.instruction:
+            sys.stderr.write("Error: --start-line, --end-line, and --instruction are required for suggest-edit\n")
+            sys.exit(1)
+        # Extract target line range
+        lines = file_content.splitlines()
+        if args.start_line < 1 or args.end_line > len(lines) or args.start_line > args.end_line:
+            sys.stderr.write(f"Error: invalid line range {args.start_line}-{args.end_line} (file has {len(lines)} lines)\n")
+            sys.exit(1)
+        # Format only the target lines with their original line numbers
+        target_lines = [(i + 1, lines[i]) for i in range(args.start_line - 1, args.end_line)]
+        formatted_code = format_numbered_lines(target_lines)
+        prompt = SUGGEST_EDIT_PROMPT.format(
+            path=args.file,
+            start_line=args.start_line,
+            end_line=args.end_line,
+            instruction=args.instruction,
+            code=formatted_code
+        )
+
+    elif args.action == "inspect-errors":
+        if not args.error:
+            sys.stderr.write("Error: --error is required for inspect-errors action\n")
+            sys.exit(1)
+        # Compress and add line numbers
+        compressed = compress_code_with_line_numbers(file_content, lang)
+        formatted_code = format_numbered_lines(compressed)
+        prompt = INSPECT_ERRORS_PROMPT.format(path=args.file, error=args.error, code=formatted_code)
+
+    # 2. Execute against the selected provider
+    try:
+        if args.provider == "agy":
+            # Acquire settings lock to prevent racing settings.json overrides
+            os.makedirs(os.path.dirname(LOCK_FILE), exist_ok=True)
+            with open(LOCK_FILE, "w") as lock_f:
+                try:
+                    fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    sys.stderr.write("Waiting for low-tier agent model settings lock...\n")
+                    fcntl.flock(lock_f, fcntl.LOCK_EX)
+                response_text = call_llm(prompt, args.provider, args.model, args.timeout)
+        else:
+            # Grok doesn't need a settings lock — model is passed inline
+            response_text = call_llm(prompt, args.provider, args.model, args.timeout)
+        parsed_json = extract_json(response_text)
+        print(json.dumps(parsed_json, indent=2))
+    except Exception as e:
+        sys.stderr.write(f"Execution Error: {e}\n")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

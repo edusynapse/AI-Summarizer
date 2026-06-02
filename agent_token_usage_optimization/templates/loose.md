@@ -19,5 +19,17 @@ python3 skills/agent_token_usage_optimization/broker.py outline <path>
 python3 skills/agent_token_usage_optimization/broker.py summary <path>
 ```
 
+## Offload Context & Edits to Low-Tier Model
+
+To reduce high-tier model token usage, offload simple context-gathering or localized editing tasks to a low-cost model using `low_tier_agent.py`:
+- Locate symbol line numbers:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-symbol --file <file> --query "<name>"`
+- Propose edits for a line range:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action suggest-edit --file <file> --start-line <num> --end-line <num> --instruction "<text>"`
+- Fix lint/compiler errors:
+  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect-errors --file <file> --error "<message>"`
+- Use Grok instead of Antigravity (optional):
+  Add `--provider grok` to any command above (uses `grok-build` model by default).
+
 Use your judgment — skip any step that doesn't help on the task at hand.
 <!-- END agent_token_usage_optimization -->
