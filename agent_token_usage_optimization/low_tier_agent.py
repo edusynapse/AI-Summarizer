@@ -9,9 +9,10 @@ Providers:
   agy  — Antigravity CLI, uses Gemini 3.5 Flash (Low) by default.
   grok — Grok CLI, uses grok-composer-2.5-fast by default.
 
-The `search` action spawns a grok sub-agent thread with read-only tools
-(grep, read_file, list_dir) enabled so a cheap, fast model can browse the
-repository and return structured findings as JSON.
+The `search` and `agent-edit` actions spawn a grok sub-agent thread with
+read-only tools (grep, read_file, list_dir) enabled so a cheap, fast model can
+browse the repository and return structured JSON. `agent-edit` still emits only
+one file creation/update proposal at a time; it does not write files.
 
 Model selection (grok):
   composer (grok-composer-2.5-fast, the DEFAULT) — use for searching, locating,
@@ -61,6 +62,15 @@ GROK_SEARCH_DISALLOWED_TOOLS = (
 
 GROK_SEARCH_INSTRUCTION = (
     "You are a read-only codebase search sub-agent. "
+    "You MAY use grep, read_file, and list_dir to investigate the repository. "
+    "You MUST NOT modify, create, or delete any files, and MUST NOT run shell "
+    "commands or fetch from the web. "
+    "Your FINAL message must be a single valid JSON object and nothing else: "
+    "no code fences, no commentary before or after."
+)
+
+GROK_AGENT_EDIT_INSTRUCTION = (
+    "You are a read-only codebase editing sub-agent. "
     "You MAY use grep, read_file, and list_dir to investigate the repository. "
     "You MUST NOT modify, create, or delete any files, and MUST NOT run shell "
     "commands or fetch from the web. "
@@ -255,6 +265,65 @@ If nothing relevant is found:
   "found": false,
   "summary": "brief note on what was searched and why nothing matched",
   "results": []
+}}
+"""
+
+AGENT_EDIT_PROMPT = """You are a codebase editing sub-agent running inside the repository at the current working directory.
+Use your read-only tools (grep, read_file, list_dir) to gather the context needed for the task. You may inspect adjacent files freely, but your final answer must propose exactly ONE file creation or ONE file update. Do not modify any files yourself.
+
+Task: {instruction}
+{scope_hint}
+Keep the output complexity low:
+- Choose the single best next file to create or update.
+- If the full task needs more files, return one file now and set "requires_followup": true with a concise "followup_query".
+- Prefer a small exact replacement block over rewriting an entire file.
+- For updates, copy "original_content" character-for-character from the target file.
+- For new files, set "operation": "create", "start_line": null, "end_line": null, and "original_content": null.
+
+Respond with a single valid JSON object as your FINAL message and nothing else:
+{{
+  "success": true,
+  "operation": "update",
+  "summary": "one-line description of the proposed one-file change",
+  "file": "relative/path.ext",
+  "start_line": 10,
+  "end_line": 25,
+  "original_content": "exact verbatim text being replaced (newlines as \\n)",
+  "replacement_content": "replacement text for this one file only (newlines as \\n)",
+  "original_line_count": 0,
+  "replacement_line_count": 0,
+  "requires_followup": false,
+  "followup_query": null
+}}
+If creating a new file:
+{{
+  "success": true,
+  "operation": "create",
+  "summary": "one-line description of the proposed new file",
+  "file": "relative/path.ext",
+  "start_line": null,
+  "end_line": null,
+  "original_content": null,
+  "replacement_content": "complete file content (newlines as \\n)",
+  "original_line_count": 0,
+  "replacement_line_count": 0,
+  "requires_followup": false,
+  "followup_query": null
+}}
+If no useful one-file change can be proposed:
+{{
+  "success": false,
+  "operation": null,
+  "summary": "brief reason",
+  "file": null,
+  "start_line": null,
+  "end_line": null,
+  "original_content": null,
+  "replacement_content": null,
+  "original_line_count": 0,
+  "replacement_line_count": 0,
+  "requires_followup": false,
+  "followup_query": null
 }}
 """
 
@@ -510,6 +579,37 @@ def call_grok_search(prompt, model, timeout, cwd):
     return out
 
 
+def call_grok_agent_edit(prompt, model, timeout, cwd):
+    """Run grok as a read-only repo agent that returns one file edit proposal."""
+    grok_model = model or DEFAULT_GROK_MODEL
+    full_prompt = f"{GROK_AGENT_EDIT_INSTRUCTION}\n\n{prompt}"
+    args = [
+        "grok",
+        "-p", full_prompt,
+        "--model", grok_model,
+        "--output-format", "plain",
+        "--always-approve",
+        "--no-memory",
+        "--no-plan",
+        "--no-subagents",
+        "--no-alt-screen",
+        "--disable-web-search",
+        "--cwd", cwd,
+        "--disallowed-tools", GROK_SEARCH_DISALLOWED_TOOLS,
+    ]
+    res = subprocess.run(
+        args,
+        capture_output=True, text=True, timeout=timeout,
+        env={**os.environ},
+    )
+    if res.returncode != 0:
+        raise RuntimeError(f"grok agent-edit exit={res.returncode}: {res.stderr[:400].strip()}")
+    out = clean_grok_output(res.stdout or "")
+    if not out:
+        raise RuntimeError("grok agent-edit returned empty output")
+    return out
+
+
 def call_llm(prompt, provider, model, timeout):
     """Dispatch to the configured provider."""
     if provider == "agy":
@@ -541,6 +641,22 @@ def extract_json(text):
             pass
 
     raise ValueError(f"Could not parse JSON from output: {text}")
+
+
+def count_content_lines(content):
+    return content.count("\n") + 1 if content else 0
+
+
+def resolve_repo_relative_path(repo_root, file_path):
+    if not file_path or os.path.isabs(file_path):
+        return None
+    normalized = os.path.normpath(file_path)
+    if normalized.startswith("..") or os.path.isabs(normalized):
+        return None
+    target = os.path.abspath(os.path.join(repo_root, normalized))
+    if os.path.commonpath([repo_root, target]) != repo_root:
+        return None
+    return target
 
 
 def validate_self_verify(parsed, action, args):
@@ -588,8 +704,8 @@ def validate_self_verify(parsed, action, args):
         repl_count = parsed.get("replacement_line_count")
         orig_content = parsed.get("original_content") or ""
         repl_content = parsed.get("replacement_content") or ""
-        actual_orig = orig_content.count("\n") + 1 if orig_content else 0
-        actual_repl = repl_content.count("\n") + 1 if repl_content else 0
+        actual_orig = count_content_lines(orig_content)
+        actual_repl = count_content_lines(repl_content)
         if orig_count is not None and orig_count != actual_orig:
             warnings.append(
                 f"LINE_COUNT: claimed original_line_count={orig_count}, actual={actual_orig}"
@@ -598,6 +714,70 @@ def validate_self_verify(parsed, action, args):
             warnings.append(
                 f"LINE_COUNT: claimed replacement_line_count={repl_count}, actual={actual_repl}"
             )
+
+    elif action == "agent-edit" and parsed.get("success"):
+        if isinstance(parsed.get("files"), list) or isinstance(parsed.get("edits"), list):
+            warnings.append("MULTI_FILE: response must describe exactly one file, not a list of files/edits")
+
+        operation = parsed.get("operation")
+        if operation not in ("update", "create"):
+            warnings.append(f"OPERATION: expected 'update' or 'create', got {operation!r}")
+
+        file_path = parsed.get("file")
+        if not isinstance(file_path, str) or not file_path:
+            warnings.append("FILE: response must include one relative file path")
+
+        orig_count = parsed.get("original_line_count")
+        repl_count = parsed.get("replacement_line_count")
+        orig_content = parsed.get("original_content") or ""
+        repl_content = parsed.get("replacement_content") or ""
+        actual_orig = count_content_lines(orig_content)
+        actual_repl = count_content_lines(repl_content)
+        if orig_count is not None and orig_count != actual_orig:
+            warnings.append(
+                f"LINE_COUNT: claimed original_line_count={orig_count}, actual={actual_orig}"
+            )
+        if repl_count is not None and repl_count != actual_repl:
+            warnings.append(
+                f"LINE_COUNT: claimed replacement_line_count={repl_count}, actual={actual_repl}"
+            )
+
+        repo_root = getattr(args, "_agent_edit_root", None)
+        target_path = resolve_repo_relative_path(repo_root, file_path) if repo_root else None
+        if file_path and not target_path:
+            warnings.append("FILE_PATH: file must be a relative path inside the search root")
+
+        if operation == "create":
+            if orig_content:
+                warnings.append("CREATE: original_content must be null or empty for new files")
+            if target_path and os.path.exists(target_path):
+                warnings.append("CREATE: target file already exists")
+        elif operation == "update":
+            if not orig_content:
+                warnings.append("UPDATE: original_content is required for updates")
+            if target_path and not os.path.exists(target_path):
+                warnings.append("UPDATE: target file does not exist")
+            if target_path and os.path.exists(target_path) and orig_content:
+                with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                    file_content = f.read()
+                start_line = parsed.get("start_line")
+                end_line = parsed.get("end_line")
+                if isinstance(start_line, int) and isinstance(end_line, int):
+                    lines = file_content.splitlines()
+                    if start_line < 1 or end_line > len(lines) or start_line > end_line:
+                        warnings.append(
+                            f"DRIFT: response line range {start_line}-{end_line} is invalid for {file_path}"
+                        )
+                    else:
+                        actual_range = "\n".join(lines[start_line - 1:end_line])
+                        if actual_range != orig_content:
+                            warnings.append(
+                                "ANCHOR_MISMATCH: original_content does not match file content for response line range"
+                            )
+                elif file_content.count(orig_content) != 1:
+                    warnings.append(
+                        "ANCHOR_MISMATCH: original_content must appear exactly once when no valid line range is provided"
+                    )
 
     if warnings:
         for w in warnings:
@@ -608,14 +788,14 @@ def validate_self_verify(parsed, action, args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--action", required=True,
-                        choices=["find-symbol", "suggest-edit", "inspect-errors", "find-anchor", "search"])
-    parser.add_argument("--file", help="Target file path (required for all actions except search)")
+                        choices=["find-symbol", "suggest-edit", "inspect-errors", "find-anchor", "search", "agent-edit"])
+    parser.add_argument("--file", help="Target file path; optional focus hint for agent-edit")
     parser.add_argument("--search-root", default=None,
-                        help="Repo root the search sub-agent runs in (search action; default: cwd)")
-    parser.add_argument("--query", help="Symbol name or search query (for find-symbol, find-anchor, search)")
+                        help="Repo root the grok sub-agent runs in (search/agent-edit action; default: cwd)")
+    parser.add_argument("--query", help="Symbol name or search query (for find-symbol, find-anchor, search; alias for agent-edit instruction)")
     parser.add_argument("--start-line", type=int, help="Start line number (for suggest-edit)")
     parser.add_argument("--end-line", type=int, help="End line number (for suggest-edit)")
-    parser.add_argument("--instruction", help="Edit instruction description (for suggest-edit)")
+    parser.add_argument("--instruction", help="Edit instruction description (for suggest-edit, agent-edit)")
     parser.add_argument("--error", help="Error message output (for inspect-errors)")
     parser.add_argument("--provider", choices=["agy", "grok"], default="agy",
                         help="LLM provider: agy (Antigravity CLI) or grok (Grok CLI)")
@@ -643,6 +823,32 @@ def main():
         try:
             response_text = call_grok_search(prompt, search_model, args.timeout, search_root)
             parsed_json = extract_json(response_text)
+            print(json.dumps(parsed_json, indent=2))
+        except Exception as e:
+            sys.stderr.write(f"Execution Error: {e}\n")
+            sys.exit(1)
+        return
+
+    # ── agent-edit: grok browses read-only, then emits one file edit proposal ──
+    if args.action == "agent-edit":
+        instruction = args.instruction or args.query
+        if not instruction:
+            sys.stderr.write("Error: --instruction or --query is required for agent-edit action\n")
+            sys.exit(1)
+        edit_root = os.path.abspath(args.search_root or os.getcwd())
+        if not os.path.isdir(edit_root):
+            sys.stderr.write(f"Error: search root is not a directory: {edit_root}\n")
+            sys.exit(1)
+        edit_model = args.model if (args.model and args.provider == "grok") else DEFAULT_GROK_MODEL
+        scope_hint = f"Focus your investigation near: {args.file}\n" if args.file else ""
+        prompt = AGENT_EDIT_PROMPT.format(instruction=instruction, scope_hint=scope_hint)
+        args._agent_edit_root = edit_root
+        try:
+            response_text = call_grok_agent_edit(prompt, edit_model, args.timeout, edit_root)
+            parsed_json = extract_json(response_text)
+            validation_warnings = validate_self_verify(parsed_json, args.action, args)
+            if validation_warnings:
+                parsed_json["_validation_warnings"] = validation_warnings
             print(json.dumps(parsed_json, indent=2))
         except Exception as e:
             sys.stderr.write(f"Execution Error: {e}\n")

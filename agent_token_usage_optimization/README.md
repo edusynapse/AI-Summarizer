@@ -65,6 +65,25 @@ summary_broker.py list models
 
 See `summary_broker.py --help` for the full set of commands.
 
+## Low-Tier Repo Agent
+
+`low_tier_agent.py` can offload small, bounded tasks to a cheaper model. For
+repo-aware code generation, use `agent-edit`: Grok may browse with read-only
+`grep`, `read_file`, and `list_dir`, but the final JSON contains only one file
+creation or one file update proposal.
+
+```bash
+python3 skills/agent_token_usage_optimization/low_tier_agent.py \
+  --action agent-edit \
+  --instruction "Add server-side validation for the invoice status field" \
+  --search-root . \
+  --file adminroutes/invoices.js \
+  --provider grok
+```
+
+If the requested task needs multiple files, run `agent-edit` repeatedly; each
+response can set `requires_followup` and provide a concise `followup_query`.
+
 ## Setup per repo
 
 ```bash

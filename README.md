@@ -15,7 +15,7 @@ Three layers, each independently useful:
 1. **Context Broker & Offloading Agent** — Three complementary tools:
    - `broker.py` — original symbol + source retrieval (`search`, `read --symbol`, `outline`…)
    - `summary_broker.py` — **summary-layer-first broker** (strongly preferred starting point)
-   - `low_tier_agent.py` — **low-tier task offloader** (offloads queries like finding symbol line numbers, suggesting localized edits, and fixing compiler/lint errors to Gemini 3.5 Flash Low)
+   - `low_tier_agent.py` — **low-tier task offloader** (offloads queries like finding symbol line numbers, suggesting localized edits, repo-aware one-file Grok edit proposals, and fixing compiler/lint errors to low-tier models)
    Together they cut per-task token spend by 60–95%.
 2. **LLM Summary Cache (`summaries/`)** — provider-backed, hash-keyed,
    incremental file summaries. Lets agents decide *whether* to open a file
@@ -41,7 +41,7 @@ AI-Summarizer/
     │   └── strict.md                      ← low-model profile
     ├── broker.py                          ← shared (original symbol/source broker)
     ├── summary_broker.py                  ← shared (summary-layer-first broker — use first)
-    ├── low_tier_agent.py                  ← NEW (low-tier task offloader — find-symbol, suggest-edit, inspect-errors)
+    ├── low_tier_agent.py                  ← NEW (low-tier task offloader — find-symbol, suggest-edit, search, agent-edit, inspect-errors)
     ├── indexer.py                         ← shared
     ├── lib/                               ← shared
     │   ├── languages.py
