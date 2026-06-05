@@ -65,6 +65,54 @@ summary_broker.py list models
 
 See `summary_broker.py --help` for the full set of commands.
 
+## Grok Repo Worker
+
+`grok_repo_agent.py` is the Grok-only worker for orchestrator-led workflows.
+Use this when Codex or Claude should stay in charge while Grok Composer does
+bounded repo search or proposes one-file edits. It never applies edits.
+
+By default, repo-wide Grok runs use a temporary clean copy with bulky artifacts
+excluded (`.git`, `node_modules`, tests, native builds, data directories, logs,
+media). The temporary copy also gets a tiny fresh Git repo and a local
+`.grok/config.toml` that disables codebase indexing, so Grok does not try to
+bundle the original repository history.
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action search \
+  --query "where are app settings loaded and validated?" \
+  --search-root . \
+  --cwd-strategy clean-copy
+```
+
+Check the filtered workspace size without calling Grok:
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action inspect-workspace \
+  --search-root . \
+  --cwd-strategy clean-copy
+```
+
+Ask Grok for a single-file edit proposal:
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action agent-edit \
+  --instruction "Add server-side validation for the invoice status field" \
+  --search-root . \
+  --file adminroutes/invoices.js
+```
+
+Useful controls:
+
+- `--timeout N`: process timeout in seconds; default is `240`.
+- `--max-turns N`: Grok turn cap; default is `8`.
+- `repo/grok_clean_excludes.txt`: preserved per-repo default clean-copy excludes.
+- `--exclude PATTERN`: add clean-copy excludes; repeat or comma-separate.
+- `--keep-workspace`: keep the temp workspace for debugging.
+- `--agent NAME`: experimental; default avoids Grok agents/subagents.
+
 ## Low-Tier Repo Agent
 
 `low_tier_agent.py` can offload small, bounded tasks to a cheaper model. For

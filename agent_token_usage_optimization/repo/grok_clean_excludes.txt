@@ -1,0 +1,10 @@
+# Additional repo-specific rsync excludes for grok_repo_agent.py clean-copy mode.
+# One pattern per line. Blank lines and lines beginning with # are ignored.
+#
+# The script already excludes common heavy directories such as:
+# .git/, node_modules/, tests/, native/, masterdata/, lang/, logs/, build/.
+#
+# Add repo-local generated artifacts or large assets here, for example:
+# .dart_tool/
+# electron/node_modules/
+# web/pdfjs/
