@@ -22,7 +22,7 @@
     "logs",
     "tmp"
   ],
-  "max_input_bytes": 60000,
+  "max_input_bytes": 500000,
   "max_files_per_run": 0,
   "provider": "agy",
   "model": "Gemini 3.5 Flash (Low)",
