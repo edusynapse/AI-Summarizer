@@ -6,39 +6,81 @@
 Before opening source files, consult the summary/broker layer under
 [skills/agent_token_usage_optimization/](skills/agent_token_usage_optimization/). Open full source files only when the summaries aren't enough.
 
-## Suggested workflow
-
-- Skim repo orientation: [skills/agent_token_usage_optimization/summaries/repo_context/](skills/agent_token_usage_optimization/summaries/repo_context/)
-- Search summaries before source: `rg -n "<concept>" skills/agent_token_usage_optimization/summaries`
-- Read a handful of relevant file summaries under `skills/agent_token_usage_optimization/summaries/repo/` to decide what to actually open.
-- Prefer broker symbol-level reads to full-file Reads when symbol-level is enough.
+## Preflight — verify Grok before use
 
 ```bash
-python3 skills/agent_token_usage_optimization/broker.py search  "<concept>"
-python3 skills/agent_token_usage_optimization/broker.py outline <path>
-python3 skills/agent_token_usage_optimization/broker.py summary <path>
+grok --version &>/dev/null && echo "grok: ok" || echo "grok: UNAVAILABLE"
 ```
 
-## Offload Context & Edits to Low-Tier Model
+If Grok is unavailable, skip `grok_repo_agent.py` steps entirely and fall back to `low_tier_agent.py` or direct Read + Edit. Do not attempt `grok_repo_agent.py` calls when preflight fails — they will hang until timeout.
 
-To reduce high-tier model token usage, offload simple context-gathering or localized editing tasks to a low-cost model using `low_tier_agent.py`:
-- Locate symbol line numbers:
-  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-symbol --file <file> --query "<name>"`
-- Find text anchors (drift-resistant alternative to line numbers):
-  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-anchor --file <file> --query "<name>"`
-- Propose edits for a line range:
-  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action suggest-edit --file <file> --start-line <num> --end-line <num> --instruction "<text>"`
-- Fix lint/compiler errors:
-  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect-errors --file <file> --error "<message>"`
-- Search the repo with a fast sub-agent (Composer 2.5) instead of grepping yourself:
-  `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action search --query "<what you're looking for>"`
-  Spawns a grok thread (`grok-composer-2.5-fast`) with read-only tools (grep/read_file/list_dir) that browses the repo and returns structured JSON `{found, summary, results:[{file,start_line,end_line,symbol,why}]}`. Add `--search-root <dir>` to scope it; `--file <dir>` as a focus hint.
-- Use Grok instead of Antigravity (optional):
-  Add `--provider grok` to any command above.
-  - **Composer (`grok-composer-2.5-fast`, the default)** — use for searching, locating, triangulating across code by reading it, and quick piece-by-piece edits. It's the right choice whenever the required output complexity is low (faster, and more faithful at reproducing verbatim edit ranges).
-  - **`--model grok-build`** — reach for it only on heavy troubleshooting: reasoning across log files, hunting bugs, or multi-file investigation that needs sustained analysis.
+## Workflow (apply in order — skip steps that don't add value)
 
-**Validation**: `suggest-edit` and `inspect-errors` responses include `_validation_warnings` if drift or line-count mismatches are detected. Check this field before blindly applying edits.
+### 1. Locate via summary layer (never grep source directly)
+
+```bash
+python3 skills/agent_token_usage_optimization/summary_broker.py search "<concept>"
+python3 skills/agent_token_usage_optimization/summary_broker.py hotspots <topic>
+python3 skills/agent_token_usage_optimization/summary_broker.py read <relative/path>
+python3 skills/agent_token_usage_optimization/summary_broker.py rollup <directory>
+```
+
+Only fall back to symbol-level source when summaries are insufficient:
+
+```bash
+python3 skills/agent_token_usage_optimization/broker.py search "<concept>"
+python3 skills/agent_token_usage_optimization/broker.py outline <path>
+python3 skills/agent_token_usage_optimization/broker.py read <path> --symbol <name>
+```
+
+### 2. Edits — primary path: grok_repo_agent.py agent-edit
+
+Grok navigates the repo itself in a clean rsync'd workspace, reads whatever
+source it needs, and returns a JSON diff (`original_content` →
+`replacement_content`). Claude never reads source files for edit tasks.
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action agent-edit \
+  --instruction "<precise description of what to change and why>" \
+  [--file <focus-hint>] [--search-root <dir>]
+```
+
+Multi-file edits can take up to 5 minutes — when invoking via an agent Bash tool, set the tool timeout to at least 400000 ms (the script's own `--timeout` defaults to 360s).
+
+Response shape: `{success, operation, file, original_content, replacement_content, requires_followup, followup_query, _validation_warnings?}`
+
+**Apply loop:**
+1. Check `_validation_warnings` — if `original_content` not found verbatim, discard and refine instruction.
+2. Apply via `Edit` tool using `original_content` as `old_string`.
+3. If `requires_followup: true`, call `agent-edit` again with `followup_query` as `--instruction`.
+
+### 3. Search — use grok_repo_agent.py search (not raw grep)
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action search --query "<what you're looking for>" [--file <focus-hint>]
+```
+
+### 4. Low-tier fallbacks (single-file, line-range tasks only)
+
+```bash
+# Locate symbol / find anchor
+python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-symbol --file <file> --query "<name>"
+python3 skills/agent_token_usage_optimization/low_tier_agent.py --action find-anchor --file <file> --query "<name>"
+
+# Suggest edit for a known line range (weaker than agent-edit — use only when range is already known)
+python3 skills/agent_token_usage_optimization/low_tier_agent.py --action suggest-edit \
+  --file <file> --start-line <n> --end-line <n> --instruction "<text>"
+
+# Fix lint/compiler errors
+python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect-errors \
+  --file <file> --error "<message>"
+```
+
+**Model guidance:**
+- `grok-composer-2.5-fast` (default) — searching, locating, edits
+- `--model grok-build` — heavy multi-file troubleshooting, log analysis, bug hunting
 
 Use your judgment — skip any step that doesn't help on the task at hand.
 <!-- END agent_token_usage_optimization -->

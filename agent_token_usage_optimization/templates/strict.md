@@ -21,7 +21,42 @@ python3 skills/agent_token_usage_optimization/broker.py outline <path>
 python3 skills/agent_token_usage_optimization/broker.py summary <path>
 ```
 
-## Offload Context & Edits to Low-Tier Model
+## Preflight — verify Grok before use
+
+```bash
+grok --version &>/dev/null && echo "grok: ok" || echo "grok: UNAVAILABLE"
+```
+
+If Grok is unavailable, skip `grok_repo_agent.py` steps entirely and fall back to `low_tier_agent.py` or direct Read + Edit. Do not attempt `grok_repo_agent.py` calls when preflight fails — they will hang until timeout.
+
+## Edits — primary path: grok_repo_agent.py agent-edit
+
+You MUST route edit tasks through `grok_repo_agent.py` before considering manual edits. Grok navigates the repo itself in a clean rsync'd workspace, reads whatever source it needs, and returns a JSON diff (`original_content` → `replacement_content`). Do not read source files yourself for edit tasks.
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action agent-edit \
+  --instruction "<precise description of what to change and why>" \
+  [--file <focus-hint>] [--search-root <dir>]
+```
+
+Multi-file edits can take up to 5 minutes — when invoking via an agent Bash tool, set the tool timeout to at least 400000 ms (the script's own `--timeout` defaults to 360s).
+
+Response shape: `{success, operation, file, original_content, replacement_content, requires_followup, followup_query, _validation_warnings?}`
+
+**Apply loop:**
+1. Check `_validation_warnings` — if `original_content` not found verbatim, discard and refine instruction.
+2. Apply via `Edit` tool using `original_content` as `old_string`.
+3. If `requires_followup: true`, call `agent-edit` again with `followup_query` as `--instruction`.
+
+Repo-wide search (use BEFORE grepping the source tree yourself):
+
+```bash
+python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
+  --action search --query "<what you're looking for>" [--file <focus-hint>]
+```
+
+## Offload Context & Edits to Low-Tier Model (single-file, known line range only)
 
 You MUST offload simple context-gathering or localized editing tasks to a low-cost model using `low_tier_agent.py`:
 - Locate symbol line numbers:
@@ -49,7 +84,7 @@ You MUST offload simple context-gathering or localized editing tasks to a low-co
 - DO NOT Read a full source file when `broker.py outline` or `broker.py summary` would suffice.
 - DO NOT skip step 1, even when the task seems familiar.
 - DO NOT silently ignore this workflow because you "know" the answer — verify against summaries first.
-- DO NOT locate functions/classes manually or propose multi-line block changes on high models if `low_tier_agent.py` can perform them.
+- DO NOT locate functions/classes manually or propose multi-line block changes on high models if `grok_repo_agent.py` or `low_tier_agent.py` can perform them.
 
 ## When summaries are stale or missing
 

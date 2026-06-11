@@ -457,7 +457,7 @@ def main():
     parser.add_argument("--no-init-clean-git", action="store_true",
                         help="Do not git init the temporary clean-copy workspace")
     parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--timeout", type=int, default=240)
+    parser.add_argument("--timeout", type=int, default=360)
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS)
     parser.add_argument("--check", action="store_true", help="Pass --check to Grok")
     parser.add_argument("--best-of-n", type=int, default=None)
