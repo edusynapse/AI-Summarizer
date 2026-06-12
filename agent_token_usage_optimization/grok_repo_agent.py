@@ -174,6 +174,50 @@ If no useful one-file proposal can be made:
 """
 
 
+MULTI_EDIT_PROMPT = """Investigate the repository and propose a BATCH of file
+creations and/or updates that together complete the task. Do not modify files
+yourself.
+
+Task: {instruction}
+{scope}
+Rules:
+- Read only the reference files the task names (plus helpers they import).
+  Avoid broad repository surveys.
+- Return every file the task asks for in one response.
+- For updates, copy "original_content" character-for-character from the target
+  file. For creates, use "operation": "create" and null "original_content".
+- Paths must be relative to the repository root.
+- If something genuinely cannot be completed, include the files you can
+  produce and set "requires_followup": true with a concise "followup_query".
+
+Return only this JSON shape:
+{{
+  "success": true,
+  "summary": "one-line description of the batch",
+  "files": [
+    {{
+      "operation": "create",
+      "file": "relative/path.ext",
+      "summary": "one-line description",
+      "original_content": null,
+      "replacement_content": "complete file content with newlines escaped"
+    }}
+  ],
+  "requires_followup": false,
+  "followup_query": null
+}}
+
+If no useful proposal can be made:
+{{
+  "success": false,
+  "summary": "brief reason",
+  "files": [],
+  "requires_followup": false,
+  "followup_query": null
+}}
+"""
+
+
 def read_exclude_file(path):
     excludes = []
     if not path or not os.path.exists(path):
@@ -400,6 +444,24 @@ def validate_edit(parsed, source_root):
     return warnings
 
 
+def validate_edit_multi(parsed, source_root):
+    warnings = []
+    if not parsed.get("success"):
+        return warnings
+    files = parsed.get("files")
+    if not isinstance(files, list) or not files:
+        return ["files must be a non-empty list"]
+    for entry in files:
+        if not isinstance(entry, dict):
+            warnings.append("non-object entry in files")
+            continue
+        entry_view = dict(entry)
+        entry_view["success"] = True
+        for warning in validate_edit(entry_view, source_root):
+            warnings.append(f"{entry.get('file')}: {warning}")
+    return warnings
+
+
 def path_size(path):
     total = 0
     if os.path.isfile(path):
@@ -440,7 +502,7 @@ def workspace_stats(workspace):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--action", required=True, choices=["search", "agent-edit", "inspect-workspace"])
+    parser.add_argument("--action", required=True, choices=["search", "agent-edit", "agent-edit-multi", "inspect-workspace"])
     parser.add_argument("--query", help="Search query; alias for agent-edit instruction")
     parser.add_argument("--instruction", help="Edit proposal instruction")
     parser.add_argument("--file", help="Optional focus path hint")
@@ -490,9 +552,13 @@ def main():
             instruction = args.instruction or args.query
             if not instruction:
                 raise RuntimeError("--instruction or --query is required for agent-edit")
-            prompt = f"{EDIT_SYSTEM}\n\n{EDIT_PROMPT.format(instruction=instruction, scope=scope)}"
+            template = MULTI_EDIT_PROMPT if args.action == "agent-edit-multi" else EDIT_PROMPT
+            prompt = f"{EDIT_SYSTEM}\n\n{template.format(instruction=instruction, scope=scope)}"
             parsed = run_grok(prompt, args, workspace)
-            warnings = validate_edit(parsed, source_root)
+            if args.action == "agent-edit-multi":
+                warnings = validate_edit_multi(parsed, source_root)
+            else:
+                warnings = validate_edit(parsed, source_root)
 
         if warnings:
             parsed["_validation_warnings"] = warnings

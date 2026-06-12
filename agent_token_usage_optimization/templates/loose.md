@@ -55,6 +55,8 @@ Response shape: `{success, operation, file, original_content, replacement_conten
 2. Apply via `Edit` tool using `original_content` as `old_string`.
 3. If `requires_followup: true`, call `agent-edit` again with `followup_query` as `--instruction`.
 
+For tasks that span several files, use `--action agent-edit-multi` instead — same flags, but the response returns a `files` array (`[{operation, file, summary, original_content, replacement_content}]`) covering the whole batch in one call. Validate and apply each entry with the same loop; `_validation_warnings` entries are prefixed with the offending file path.
+
 ### 3. Search — use grok_repo_agent.py search (not raw grep)
 
 ```bash
