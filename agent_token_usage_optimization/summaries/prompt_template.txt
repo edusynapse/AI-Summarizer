@@ -17,18 +17,38 @@ One sentence, phrased as a decision rule:
 This is the single most important line — agents use it to decide whether
 to open the file at all.
 
+## NOT USEFUL FOR
+One sentence naming the nearest commonly confused responsibility that is
+handled elsewhere. Format: "Not for ___." Write `none` if no meaningful
+distinction is evident from the contents.
+
 ## KEY EXPORTS
 Bullet list, max 8 items. One per line, format:
-- `name(args)` — one-line description of what it does or returns.
+- `Qualified.name(args)` — one-line description of what it does or returns.
+Use exact identifiers and signatures where visible; include symbol kind when
+the name alone is ambiguous.
 Skip private helpers. If the file exports nothing public, write the
 single line: none.
 
-## DEPENDS ON
+## NAVIGATION
+Bullet list, max 6 items. Point agents to the highest-value locations using:
+- `<role>` — `<exact qualified symbol or unique searchable anchor>` — approx lines `<start>-<end>`
+Prioritize entrypoints, main control flow, validation, persistence/network
+boundaries, and error/fallback paths. Include useful cross-file jumps as
+`calls/called by/implements/registered in -> path::symbol`. Line numbers are
+approximate hints: never give one without an exact symbol or unique anchor.
+Write `none` only when the file has no meaningful internal navigation points.
+
+## INTERNAL DEPENDENCIES
 Comma-separated list of INTERNAL modules this file imports (relative
 paths within the repo, or first-party package-internal names). Max 10
-items. Skip stdlib and third-party packages unless central to behavior
-(e.g., express, mongoose belong here; lodash does not). Write
+items. Prefer `path::symbol` when a specific dependency is central. Write
 "none significant" if trivial.
+
+## EXTERNAL SYSTEMS
+Comma-separated list of third-party frameworks, services, protocols, data
+stores, or platform APIs central to behavior. Use exact names. Skip incidental
+libraries and stdlib. Write `none significant` if trivial.
 
 ## SIDE EFFECTS
 Comma-separated, choose from: database writes, database reads,
@@ -36,10 +56,10 @@ network calls, filesystem, process state, none.
 Add a max-5-word qualifier per item if non-obvious, e.g.,
 "database writes (upserts crossword masters)".
 
-## INVARIANTS & GOTCHAS
+## HIDDEN CONTRACTS & FAILURE MODES
 Bullet list, max 4 items. ONLY non-obvious things a reader could miss:
-hidden contracts, ordering requirements, surprising behavior, known
-footguns, undocumented assumptions. If none, write a single line: none.
+ordering requirements, validation assumptions, fallback behavior, partial
+failure, retry/idempotency rules, or known footguns. If none, write a single line: none.
 DO NOT pad this section. Empty is acceptable and preferred over filler.
 
 ## DOMAIN CONCEPTS
@@ -53,6 +73,9 @@ HARD RULES (violations make the summary useless):
 - No prose outside the listed sections.
 - No "this file" / "this module" filler.
 - If a section truly has nothing to say, write `none`. Never invent.
+- Preserve exact casing and spelling for symbols, routes, config keys,
+  environment variables, database entities, events, and error anchors.
+- Prefer stable symbols and unique text anchors over line numbers.
 - Do not summarize the imports list as content.
 - Do not describe coding style, formatting, or language features.
 - Do not speculate about future work or refactoring opportunities.
