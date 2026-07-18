@@ -4,8 +4,8 @@
 # Usage:  ./install.sh /path/to/target_repo
 #
 # Shared files (broker.py, indexer.py, lib/*, summaries/summarizer.py,
-# summaries/rollup_summarizer.py, summaries/*_prompt_template.txt,
-# summaries/README.md, repo_context/README.md,
+# summaries/run_grok_cli_summaries.sh, summaries/rollup_summarizer.py,
+# summaries/*_prompt_template.txt, summaries/README.md, repo_context/README.md,
 # .gitignores, top-level READMEs) are always overwritten.
 #
 # Per-repo files (repo/config.json, summaries/config.json,
@@ -65,6 +65,7 @@ copy_shared "summaries/prompt_template.txt"
 copy_shared "summaries/rollup_prompt_template.txt"
 copy_shared "summaries/summarizer.py"
 copy_shared "summaries/rollup_summarizer.py"
+copy_shared "summaries/run_grok_cli_summaries.sh"
 copy_shared "summaries/.gitignore"
 copy_shared "summaries/repo_context/README.md"
 copy_shared "templates/loose.md"
@@ -86,7 +87,16 @@ copy_template "repo/grok_clean_excludes.txt"
 copy_template "summaries/config.json"
 copy_template "summaries/rollups_config.json"
 
-chmod +x "$DST_DIR/broker.py" "$DST_DIR/indexer.py" "$DST_DIR/summary_broker.py" "$DST_DIR/low_tier_agent.py" "$DST_DIR/grok_repo_agent.py" "$DST_DIR/summaries/summarizer.py" "$DST_DIR/summaries/rollup_summarizer.py" || true
+chmod +x \
+  "$DST_DIR/broker.py" \
+  "$DST_DIR/indexer.py" \
+  "$DST_DIR/summary_broker.py" \
+  "$DST_DIR/low_tier_agent.py" \
+  "$DST_DIR/grok_repo_agent.py" \
+  "$DST_DIR/summaries/summarizer.py" \
+  "$DST_DIR/summaries/rollup_summarizer.py" \
+  "$DST_DIR/summaries/run_grok_cli_summaries.sh" \
+  || true
 
 # --- agent instruction files (CLAUDE.md + AGENTS.md) ---
 # Both are auto-loaded by their respective runtimes into every session in the
@@ -145,8 +155,12 @@ echo "  edit  skills/agent_token_usage_optimization/summaries/config.json"
 echo "  edit  skills/agent_token_usage_optimization/summaries/rollups_config.json"
 echo "  fill  skills/agent_token_usage_optimization/summaries/repo_context/*.md"
 echo "  run   python3 skills/agent_token_usage_optimization/broker.py index"
-echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py"
+echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py --dry-run"
+echo "  run   bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh"
+echo "        # preferred parallel path: bash grok CLI (no AGY race). MODEL=… PARALLEL=…"
+echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py   # agy/gemini serial"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py"
+echo "  run   python3 skills/agent_token_usage_optimization/indexer.py"
 echo "  track skills/agent_token_usage_optimization/repo/index.sqlite if you commit the broker index"
 echo "  ignore __pycache__/ and *.py[cod] in the target repo root .gitignore"
 echo

@@ -10,7 +10,8 @@ summaries/
 ├── README.md             this file
 ├── config.json           REPO-SPECIFIC: include/exclude rules + model knobs
 ├── prompt_template.txt   SHARED: explicit prompt enforcing terse structured output
-├── summarizer.py         SHARED: incremental update script
+├── summarizer.py         SHARED: incremental update (agy / gemini CLIs, serial)
+├── run_grok_cli_summaries.sh  SHARED: parallel bash `grok` CLI path (preferred)
 ├── manifest.json         GENERATED: path → sha1 hash of last summarized version
 ├── repo/                 GENERATED: mirrors source tree, one `<path>.md` per file
 ├── rollups_config.json   REPO-SPECIFIC: include-list for directory rollups
@@ -26,6 +27,34 @@ Shared files are identical in every repo. `config.json`, `manifest.json`,
 `repo_context/` are repo-specific.
 
 ## Usage
+
+### Preferred: bash Grok CLI (parallel, no AGY race)
+
+Uses headless `grok` with tools stripped (`--tools ""`, denylist, `--max-turns 3`,
+`--system-prompt-override`, `--verbatim`, `--no-subagents`). Parent process builds
+the prompt, writes `repo/<path>.md`, and merges SHA-1 into `manifest.json`.
+Safe to run multiple workers in parallel under the same OS user (unlike AGY).
+
+```bash
+# from repo root
+python3 skills/agent_token_usage_optimization/summaries/summarizer.py --dry-run
+
+# summarize all new+changed (auto work list from summarizer.plan):
+bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh
+
+# tune:
+PARALLEL=6 MODEL=grok-4.5 MAX_TURNS=3 \
+  bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh
+
+# then rebuild symbol index:
+python3 skills/agent_token_usage_optimization/indexer.py
+```
+
+Requires `grok` on `$PATH` (`grok models` must list your `MODEL`). Defaults to
+`grok-4.5`. Do **not** use internal `spawn_subagent` for this — it researches
+and thrash-loops; the CLI path is the supported mechanism.
+
+### Alternate: serial AGY / Gemini via `summarizer.py`
 
 ```bash
 # from repo root
@@ -92,18 +121,25 @@ regenerate despite unchanged inputs.
 
 ## Gotchas
 
-- Default backend is `agy` with model display name `Gemini 3.5 Flash (Low)`.
+### Grok CLI path (`run_grok_cli_summaries.sh`)
+- Prefer this for bulk / parallel runs.
+- `--max-turns 1` can fail with `Max turns reached`; default is **3**.
+- Parent owns the manifest SHA-1 (never trust the model to write it).
+- Failures leave the previous hash so the next run retries those files.
+
+### AGY path (`summarizer.py --provider agy`)
+- Default backend for `summarizer.py` is `agy` / `Gemini 3.5 Flash (Low)`.
 - `agy` CLI must be on `$PATH` and authenticated.
 - `agy` has no safe per-call model flag here. The summarizer temporarily writes
   the requested model to `~/.gemini/antigravity-cli/settings.json`, calls `agy`
-  with the prompt on stdin, then restores the previous model. Do not run two
-  `agy` summarizer jobs in parallel under the same OS user.
+  with the prompt on stdin, then restores the previous model. **Do not run two
+  `agy` summarizer jobs in parallel under the same OS user.**
 - Gemini is still available with `--provider gemini --model gemini-3-flash-preview`.
 - `rollup_summarizer.py` uses the same provider/model settings and AGY caveats
   as `summarizer.py`.
-- Files over `max_input_bytes` (default 60KB) are truncated. Very large
-  files would need chunked summarization — not implemented in this cut.
-- The prompt template is intentionally strict. If you change it, the
-  cached summaries become inconsistent until everything is regenerated;
-  bump a version field in `config.json` and clear `manifest.json` to
-  force a full rebuild.
+
+### General
+- Files over `max_input_bytes` (config; often 60KB–500KB) are truncated.
+- The prompt template is intentionally strict. If you change it, cached
+  summaries become inconsistent until regenerated; bump a version field in
+  `config.json` and clear `manifest.json` to force a full rebuild.
