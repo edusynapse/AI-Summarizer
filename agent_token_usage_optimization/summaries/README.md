@@ -11,7 +11,8 @@ summaries/
 ├── config.json           REPO-SPECIFIC: include/exclude rules + model knobs
 ├── prompt_template.txt   SHARED: explicit prompt enforcing terse structured output
 ├── summarizer.py         SHARED: incremental update (agy / gemini CLIs, serial)
-├── run_grok_cli_summaries.sh  SHARED: parallel bash `grok` CLI path (preferred)
+├── run_grok_cli_summaries.sh  SHARED: parallel bash `grok` CLI path
+├── run_agy_cli_summaries.sh   SHARED: parallel bash `agy` CLI path
 ├── manifest.json         GENERATED: path → sha1 hash of last summarized version
 ├── repo/                 GENERATED: mirrors source tree, one `<path>.md` per file
 ├── rollups_config.json   REPO-SPECIFIC: include-list for directory rollups
@@ -26,14 +27,60 @@ Shared files are identical in every repo. `config.json`, `manifest.json`,
 `repo/`, `rollups_config.json`, `rollups_manifest.json`, `rollups/`, and
 `repo_context/` are repo-specific.
 
+## Model
+
+**Current best for summarization: `Gemini 3.6 Flash (Low)` via `agy`.** It is
+the right cost/quality point for this workload — summaries are short, highly
+structured, and gain nothing from a thinking tier. Prefer it unless you have a
+specific reason not to; every example below assumes it.
+
+Select it once with agy `/model`. `run_agy_cli_summaries.sh` asserts it and
+refuses to run against anything else rather than silently switching your model.
+
 ## Usage
 
-### Preferred: bash Grok CLI (parallel, no AGY race)
+Both bulk paths below are parallel-safe for the same reason: **the parent process
+owns `manifest.json`.** Workers only write their own result record; the parent
+merges every result once, at the end. Never run N copies of `summarizer.py`
+instead — it loads the manifest at start and whole-dict overwrites it at exit,
+so concurrent processes silently drop each other's hashes and you pay to
+re-summarize those files on the next run.
+
+### Parallel: bash AGY CLI (`run_agy_cli_summaries.sh`)
+
+```bash
+# from repo root — select the model ONCE via agy /model, then:
+bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
+
+# tune:
+PARALLEL=5 MODEL="Gemini 3.6 Flash (Low)" \
+  bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
+
+# scope to a subset (fnmatch on relpath; pruning is suppressed when scoped):
+ONLY='routes/*' bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
+```
+
+**This runner never writes `~/.gemini/antigravity-cli/settings.json`.** That is
+the whole reason it can run in parallel next to a human using `agy` on the
+console. It asserts the requested model is already selected and aborts with a
+message if not — set it once with agy `/model`. Contrast `summarizer.py`, which
+temporarily rewrites that file per call (see the AGY gotchas below).
+
+Prompts are built through `summarizer.build_prompt` + `AGY_HEADLESS_INSTRUCTION`,
+so summaries stay byte-consistent with the serial path. A quota-block or refusal
+produces no `## PURPOSE` heading → **no hash is recorded**, so that file retries
+on the next run rather than caching a bad summary.
+
+Measured 2026-07-22: 187 files (backend) + 65 (Flutter) at `PARALLEL=5` on
+`Gemini 3.6 Flash (Low)` → 252/252 OK, 0 failures, manifest key counts landing
+exactly on `tracked=`.
+
+### Parallel: bash Grok CLI
 
 Uses headless `grok` with tools stripped (`--tools ""`, denylist, `--max-turns 3`,
 `--system-prompt-override`, `--verbatim`, `--no-subagents`). Parent process builds
 the prompt, writes `repo/<path>.md`, and merges SHA-1 into `manifest.json`.
-Safe to run multiple workers in parallel under the same OS user (unlike AGY).
+Safe to run multiple workers in parallel under the same OS user.
 
 ```bash
 # from repo root
@@ -54,7 +101,10 @@ Requires `grok` on `$PATH` (`grok models` must list your `MODEL`). Defaults to
 `grok-4.5`. Do **not** use internal `spawn_subagent` for this — it researches
 and thrash-loops; the CLI path is the supported mechanism.
 
-### Alternate: serial AGY / Gemini via `summarizer.py`
+### Serial: AGY / Gemini via `summarizer.py`
+
+Use for small scoped runs, or when you want a provider the bulk runners don't
+cover (`gemini`). For anything bulk, prefer a parallel runner above.
 
 ```bash
 # from repo root
@@ -65,11 +115,11 @@ python3 skills/agent_token_usage_optimization/summaries/summarizer.py --limit 20
 
 # Pick provider/model for a scoped run.
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
-  --provider agy --model "Gemini 3.5 Flash (Low)"
+  --provider agy --model "Gemini 3.6 Flash (Low)"
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir models \
   --provider agy \
-  --model "Gemini 3.5 Flash (Low)" \
+  --model "Gemini 3.6 Flash (Low)" \
   --timeout 300
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir lib/crossword \
@@ -111,7 +161,7 @@ python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 # One-off or scoped rollups:
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --dir lib/helpers
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py \
-  --dir libadmin --provider agy --model "Gemini 3.5 Flash (Low)" --timeout 300
+  --dir libadmin --provider agy --model "Gemini 3.6 Flash (Low)" --timeout 300
 ```
 
 Rollups are hash-based. `rollups_manifest.json` records the digest of all input
@@ -121,19 +171,35 @@ regenerate despite unchanged inputs.
 
 ## Gotchas
 
+### AGY CLI path (`run_agy_cli_summaries.sh`)
+- Preferred for bulk agy runs. Parallel-safe: parent-owned manifest, and it
+  never touches `settings.json`.
+- Aborts if the selected agy model != `MODEL`. That is deliberate — fix it with
+  agy `/model`, do not "fix" it by making the script write settings.
+- Watch quota: one 5h window of `Gemini 3.6 Flash (Low)` is roughly 260 calls,
+  and a full two-repo refresh can approach that. Failed files keep their old
+  hash and resume free in the next window.
+
 ### Grok CLI path (`run_grok_cli_summaries.sh`)
-- Prefer this for bulk / parallel runs.
+- Parallel-safe, same parent-owned-manifest design. Use when grok is the
+  cheaper/available tier.
 - `--max-turns 1` can fail with `Max turns reached`; default is **3**.
 - Parent owns the manifest SHA-1 (never trust the model to write it).
 - Failures leave the previous hash so the next run retries those files.
 
 ### AGY path (`summarizer.py --provider agy`)
-- Default backend for `summarizer.py` is `agy` / `Gemini 3.5 Flash (Low)`.
+- Default backend for `summarizer.py` is `agy` / `Gemini 3.6 Flash (Low)`.
 - `agy` CLI must be on `$PATH` and authenticated.
 - `agy` has no safe per-call model flag here. The summarizer temporarily writes
   the requested model to `~/.gemini/antigravity-cli/settings.json`, calls `agy`
   with the prompt on stdin, then restores the previous model. **Do not run two
-  `agy` summarizer jobs in parallel under the same OS user.**
+  `summarizer.py --provider agy` jobs in parallel under the same OS user**, and
+  be aware this write races with a human using agy on the console even when it
+  ends up restoring the same value.
+  - The set/restore is a genuine no-op only when the requested model already
+    equals the one in `settings.json` (`set_agy_model` returns early). That is
+    the loophole `run_agy_cli_summaries.sh` turns into a hard precondition —
+    which is why it asserts instead of writing.
 - Gemini is still available with `--provider gemini --model gemini-3-flash-preview`.
 - `rollup_summarizer.py` uses the same provider/model settings and AGY caveats
   as `summarizer.py`.

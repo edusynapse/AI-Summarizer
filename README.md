@@ -56,7 +56,8 @@ AI-Summarizer/
     └── summaries/
         ├── README.md                      ← shared
         ├── summarizer.py                  ← shared (agy/gemini serial)
-        ├── run_grok_cli_summaries.sh      ← shared (preferred: parallel bash `grok` CLI)
+        ├── run_grok_cli_summaries.sh      ← shared (parallel bash `grok` CLI)
+        ├── run_agy_cli_summaries.sh       ← shared (parallel bash `agy` CLI)
         ├── rollup_summarizer.py           ← shared
         ├── prompt_template.txt            ← shared
         ├── rollup_prompt_template.txt     ← shared
@@ -170,9 +171,12 @@ $EDITOR skills/agent_token_usage_optimization/summaries/repo_context/00_what_thi
 python3 skills/agent_token_usage_optimization/broker.py index
 
 # 4. backfill LLM summaries (the foundation for summary_broker.py)
-# preferred: parallel bash grok CLI (no AGY race; see summaries/README.md)
-bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh
-# alternate serial: python3 …/summarizer.py --provider agy --model "Gemini 3.5 Flash (Low)"
+# parallel runners — both parent-merge the manifest, so N workers are safe.
+# agy: select the model ONCE via agy /model; the runner asserts it and never
+# writes settings.json (see summaries/README.md).
+PARALLEL=5 bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
+# or grok: bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh
+# alternate serial: python3 …/summarizer.py --provider agy --model "Gemini 3.6 Flash (Low)"
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 python3 skills/agent_token_usage_optimization/indexer.py
 

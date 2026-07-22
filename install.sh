@@ -4,7 +4,8 @@
 # Usage:  ./install.sh /path/to/target_repo
 #
 # Shared files (broker.py, indexer.py, lib/*, summaries/summarizer.py,
-# summaries/run_grok_cli_summaries.sh, summaries/rollup_summarizer.py,
+# summaries/run_agy_cli_summaries.sh, summaries/run_grok_cli_summaries.sh,
+# summaries/rollup_summarizer.py,
 # summaries/*_prompt_template.txt, summaries/README.md, repo_context/README.md,
 # .gitignores, top-level READMEs) are always overwritten.
 #
@@ -66,6 +67,7 @@ copy_shared "summaries/rollup_prompt_template.txt"
 copy_shared "summaries/summarizer.py"
 copy_shared "summaries/rollup_summarizer.py"
 copy_shared "summaries/run_grok_cli_summaries.sh"
+copy_shared "summaries/run_agy_cli_summaries.sh"
 copy_shared "summaries/.gitignore"
 copy_shared "summaries/repo_context/README.md"
 copy_shared "templates/loose.md"
@@ -96,6 +98,7 @@ chmod +x \
   "$DST_DIR/summaries/summarizer.py" \
   "$DST_DIR/summaries/rollup_summarizer.py" \
   "$DST_DIR/summaries/run_grok_cli_summaries.sh" \
+  "$DST_DIR/summaries/run_agy_cli_summaries.sh" \
   || true
 
 # --- agent instruction files (CLAUDE.md + AGENTS.md) ---
@@ -157,7 +160,10 @@ echo "  fill  skills/agent_token_usage_optimization/summaries/repo_context/*.md"
 echo "  run   python3 skills/agent_token_usage_optimization/broker.py index"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py --dry-run"
 echo "  run   bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh"
-echo "        # preferred parallel path: bash grok CLI (no AGY race). MODEL=… PARALLEL=…"
+echo "        # parallel path via grok CLI. MODEL=… PARALLEL=…"
+echo "  run   bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh"
+echo "        # parallel path via agy CLI. Select the model ONCE with agy /model first;"
+echo "        # this runner asserts it and never writes settings.json. PARALLEL=… ONLY=…"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py   # agy/gemini serial"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py"
 echo "  run   python3 skills/agent_token_usage_optimization/indexer.py"

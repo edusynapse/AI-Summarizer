@@ -178,7 +178,7 @@ Provider/model can be selected per run:
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir libadmin \
   --provider agy \
-  --model "Gemini 3.5 Flash (Low)" \
+  --model "Gemini 3.6 Flash (Low)" \
   --timeout 300
 
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \

@@ -13,7 +13,7 @@ Run:
   python3 rollup_summarizer.py --dry-run
   python3 rollup_summarizer.py
   python3 rollup_summarizer.py --dir lib/helpers
-  python3 rollup_summarizer.py --dir libadmin --provider agy --model "Gemini 3.5 Flash (Low)"
+  python3 rollup_summarizer.py --dir libadmin --provider agy --model "Gemini 3.6 Flash (Low)"
   python3 rollup_summarizer.py --force --dir routes
 """
 import argparse
