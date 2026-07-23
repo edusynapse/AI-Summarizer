@@ -172,19 +172,13 @@ python3 skills/agent_token_usage_optimization/summaries/summarizer.py --dir lib/
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py --only "lib/widgets/*.dart"
 ```
 
-Provider/model can be selected per run:
+Model can be selected per run (provider is always `agy`):
 
 ```bash
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir libadmin \
-  --provider agy \
   --model "Gemini 3.6 Flash (Low)" \
   --timeout 300
-
-python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
-  --dir models \
-  --provider gemini \
-  --model gemini-3-flash-preview
 ```
 
 `manifest.json` records the source hash for each summarized file. Changed or

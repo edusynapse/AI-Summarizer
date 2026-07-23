@@ -13,7 +13,7 @@ Run:
   python3 rollup_summarizer.py --dry-run
   python3 rollup_summarizer.py
   python3 rollup_summarizer.py --dir lib/helpers
-  python3 rollup_summarizer.py --dir libadmin --provider agy --model "Gemini 3.6 Flash (Low)"
+  python3 rollup_summarizer.py --dir libadmin --model "Gemini 3.6 Flash (Low)"
   python3 rollup_summarizer.py --force --dir routes
 """
 import argparse
@@ -33,7 +33,7 @@ ROLLUPS_MANIFEST_PATH = os.path.join(HERE, "rollups_manifest.json")
 ROLLUP_PROMPT_PATH = os.path.join(HERE, "rollup_prompt_template.txt")
 
 sys.path.insert(0, HERE)
-from summarizer import call_llm, load_config, DEFAULT_PROVIDER, DEFAULT_AGY_MODEL, DEFAULT_GEMINI_MODEL  # noqa: E402
+from summarizer import call_llm, load_config, DEFAULT_PROVIDER, DEFAULT_AGY_MODEL  # noqa: E402
 
 
 def load_json(path, fallback):
@@ -158,7 +158,7 @@ def main():
     ap.add_argument("--force", action="store_true", help="regenerate even when inputs are unchanged")
     ap.add_argument("--dir", action="append", help="directory to roll up; may be repeated")
     ap.add_argument("--limit", type=int, default=0, help="cap rollups processed this run")
-    ap.add_argument("--provider", choices=["agy", "gemini"], help="override summaries/config.json provider")
+    ap.add_argument("--provider", choices=["agy"], help="LLM provider (agy only)")
     ap.add_argument("--model", help="override summaries/config.json model")
     ap.add_argument("--timeout", type=int, help="override provider timeout in seconds")
     args = ap.parse_args()
@@ -224,8 +224,8 @@ def main():
     provider = args.provider or llm_cfg.get("provider", DEFAULT_PROVIDER)
     model = args.model or llm_cfg.get("model")
     if not model:
-        model = DEFAULT_AGY_MODEL if provider == "agy" else DEFAULT_GEMINI_MODEL
-    timeout_key = "agy_timeout_sec" if provider == "agy" else "gemini_timeout_sec"
+        model = DEFAULT_AGY_MODEL
+    timeout_key = "agy_timeout_sec"
     timeout = args.timeout or llm_cfg.get(timeout_key, llm_cfg.get("timeout_sec", 120))
     print(f"  provider={provider} model=\"{model}\" timeout={timeout}s")
 

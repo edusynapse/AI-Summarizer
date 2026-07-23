@@ -10,7 +10,7 @@ summaries/
 ├── README.md             this file
 ├── config.json           REPO-SPECIFIC: include/exclude rules + model knobs
 ├── prompt_template.txt   SHARED: explicit prompt enforcing terse structured output
-├── summarizer.py         SHARED: incremental update (agy / gemini CLIs, serial)
+├── summarizer.py         SHARED: incremental update (agy CLI, serial)
 ├── run_grok_cli_summaries.sh  SHARED: parallel bash `grok` CLI path
 ├── run_agy_cli_summaries.sh   SHARED: parallel bash `agy` CLI path
 ├── manifest.json         GENERATED: path → sha1 hash of last summarized version
@@ -101,10 +101,9 @@ Requires `grok` on `$PATH` (`grok models` must list your `MODEL`). Defaults to
 `grok-4.5`. Do **not** use internal `spawn_subagent` for this — it researches
 and thrash-loops; the CLI path is the supported mechanism.
 
-### Serial: AGY / Gemini via `summarizer.py`
+### Serial: AGY via `summarizer.py`
 
-Use for small scoped runs, or when you want a provider the bulk runners don't
-cover (`gemini`). For anything bulk, prefer a parallel runner above.
+Use for small scoped runs. For anything bulk, prefer a parallel runner above.
 
 ```bash
 # from repo root
@@ -113,18 +112,13 @@ python3 skills/agent_token_usage_optimization/summaries/summarizer.py
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py --only "lib/**"
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py --limit 20
 
-# Pick provider/model for a scoped run.
+# Pick the model for a scoped run (provider is always agy).
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
-  --provider agy --model "Gemini 3.6 Flash (Low)"
+  --model "Gemini 3.6 Flash (Low)"
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir models \
-  --provider agy \
   --model "Gemini 3.6 Flash (Low)" \
   --timeout 300
-python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
-  --dir lib/crossword \
-  --provider gemini \
-  --model gemini-3-flash-preview
 ```
 
 Incremental behavior:
@@ -161,7 +155,7 @@ python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 # One-off or scoped rollups:
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --dir lib/helpers
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py \
-  --dir libadmin --provider agy --model "Gemini 3.6 Flash (Low)" --timeout 300
+  --dir libadmin --model "Gemini 3.6 Flash (Low)" --timeout 300
 ```
 
 Rollups are hash-based. `rollups_manifest.json` records the digest of all input
@@ -200,7 +194,6 @@ regenerate despite unchanged inputs.
     equals the one in `settings.json` (`set_agy_model` returns early). That is
     the loophole `run_agy_cli_summaries.sh` turns into a hard precondition —
     which is why it asserts instead of writing.
-- Gemini is still available with `--provider gemini --model gemini-3-flash-preview`.
 - `rollup_summarizer.py` uses the same provider/model settings and AGY caveats
   as `summarizer.py`.
 

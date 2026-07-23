@@ -96,7 +96,7 @@ def cmd_diff(args):
 
 def cmd_summary(args):
     if args.file:
-        # 1. LLM summary (preferred — semantic, written by gemini)
+        # 1. LLM summary (preferred — semantic, written by agy)
         llm_path = os.path.join(LLM_SUMMARIES_DIR, args.file + ".md")
         if os.path.exists(llm_path):
             with open(llm_path) as f:

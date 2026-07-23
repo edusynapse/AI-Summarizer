@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LLM-based per-file summarizer (agy or gemini CLI backend).
+"""LLM-based per-file summarizer (agy CLI backend).
 
 Walks the repo per `config.json`, hashes each tracked file, compares against
 `manifest.json`, and (re)generates summaries via the configured LLM CLI.
@@ -39,7 +39,6 @@ AGY_SETTINGS_PATH = os.environ.get(
 )
 DEFAULT_PROVIDER = "agy"
 DEFAULT_AGY_MODEL = "Gemini 3.6 Flash (Low)"
-DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
 
 AGY_HEADLESS_INSTRUCTION = (
     "Do not use tools, do not write files, and do not explain. "
@@ -119,26 +118,6 @@ def read_prompt_template():
         return f.read()
 
 
-def call_gemini(prompt, model, timeout):
-    if len(prompt.encode("utf-8")) > 60000:
-        res = subprocess.run(
-            ["gemini", "--model", model],
-            input=prompt,
-            capture_output=True, text=True, timeout=timeout,
-        )
-    else:
-        res = subprocess.run(
-            ["gemini", "--model", model, "-p", prompt],
-            capture_output=True, text=True, timeout=timeout,
-        )
-    if res.returncode != 0:
-        raise RuntimeError(f"gemini exit={res.returncode}: {res.stderr[:400].strip()}")
-    out = (res.stdout or "").strip()
-    if not out:
-        raise RuntimeError("gemini returned empty output")
-    return out
-
-
 def read_agy_settings():
     with open(AGY_SETTINGS_PATH) as f:
         return json.load(f)
@@ -204,8 +183,6 @@ def call_agy(prompt, model, timeout):
 def call_llm(prompt, provider, model, timeout):
     if provider == "agy":
         return call_agy(prompt, model, timeout)
-    if provider == "gemini":
-        return call_gemini(prompt, model, timeout)
     raise ValueError(f"unsupported provider: {provider}")
 
 
@@ -281,7 +258,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="cap files processed this run")
     ap.add_argument("--only", help="fnmatch pattern on relative path")
     ap.add_argument("--dir", help="restrict to one subdirectory (e.g. models, lib/crossword)")
-    ap.add_argument("--provider", choices=["agy", "gemini"], help="override config provider")
+    ap.add_argument("--provider", choices=["agy"], help="LLM provider (agy only)")
     ap.add_argument("--model", help="override config model")
     ap.add_argument("--timeout", type=int, help="override provider timeout in seconds")
     args = ap.parse_args()
@@ -331,8 +308,8 @@ def main():
     provider = args.provider or cfg.get("provider", DEFAULT_PROVIDER)
     model = args.model or cfg.get("model")
     if not model:
-        model = DEFAULT_AGY_MODEL if provider == "agy" else DEFAULT_GEMINI_MODEL
-    timeout_key = "agy_timeout_sec" if provider == "agy" else "gemini_timeout_sec"
+        model = DEFAULT_AGY_MODEL
+    timeout_key = "agy_timeout_sec"
     timeout = args.timeout or cfg.get(timeout_key, cfg.get("timeout_sec", 120))
     max_bytes = cfg.get("max_input_bytes", 60000)
     print(f"  provider={provider} model=\"{model}\" timeout={timeout}s")

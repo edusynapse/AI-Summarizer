@@ -26,6 +26,5 @@
   "max_files_per_run": 0,
   "provider": "agy",
   "model": "Gemini 3.6 Flash (Low)",
-  "agy_timeout_sec": 300,
-  "gemini_timeout_sec": 120
+  "agy_timeout_sec": 300
 }
