@@ -1,6 +1,7 @@
 {
   "_comment": "Repo-specific config for the LLM summarizer. Same shape in every repo.",
-  "include_extensions": [".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".py"],
+  "_project_reference": "KTW monorepo often also excludes dirs: masterdata, releases, dev_plans (and sometimes lang). Re-add under exclude_dirs if your tree has them.",
+  "include_extensions": [".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".py", ".go", ".rs", ".java", ".dart"],
   "exclude_files": [
     "**/*.min.js",
     "**/*.bundle.js",
@@ -15,9 +16,8 @@
     "build",
     ".next",
     "coverage",
-    "masterdata",
-    "releases",
-    "dev_plans",
+    "vendor",
+    "__pycache__",
     "skills",
     "logs",
     "tmp"

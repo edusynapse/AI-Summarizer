@@ -2,9 +2,19 @@
 # One pattern per line. Blank lines and lines beginning with # are ignored.
 #
 # The script already excludes common heavy directories such as:
-# .git/, node_modules/, tests/, native/, masterdata/, lang/, logs/, build/.
+#   .git/, node_modules/, dist/, build/, coverage/, logs/, __pycache__/
+# and (by default) tests/ and common media under tests/.
 #
 # Add repo-local generated artifacts or large assets here, for example:
-# .dart_tool/
-# electron/node_modules/
-# web/pdfjs/
+#   .dart_tool/
+#   electron/node_modules/
+#   web/pdfjs/
+#   vendor/
+#
+# --- project reference (KTW / large monorepos) — uncomment if needed ---
+# masterdata/
+# lang/
+# native/
+# releases/
+# dev_plans/
+# logs/

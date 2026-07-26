@@ -7,21 +7,15 @@ CLI tools.
 
 Providers:
   agy  — Antigravity CLI, uses Gemini 3.6 Flash (Low) by default.
-  grok — Grok CLI, uses grok-composer-2.5-fast by default.
+  grok — Grok CLI, uses grok-4.5 by default (Composer is not offered).
 
 The `search` and `agent-edit` actions spawn a grok sub-agent thread with
-read-only tools (grep, read_file, list_dir) enabled so a cheap, fast model can
-browse the repository and return structured JSON. `agent-edit` still emits only
+read-only tools (grep, read_file, list_dir) enabled so the model can browse
+the repository and return structured JSON. `agent-edit` still emits only
 one file creation/update proposal at a time; it does not write files.
 
-Model selection (grok):
-  composer (grok-composer-2.5-fast, the DEFAULT) — use for searching, locating,
-    triangulating across code by reading it, and quick piece-by-piece edits.
-    Composer wins whenever the required OUTPUT complexity is low; it is also
-    faster and, in practice, more faithful at reproducing verbatim edit ranges.
-  grok-build (--model grok-build) — reach for it only on heavy troubleshooting:
-    reasoning across log files, hunting bugs, or multi-file investigation where
-    the answer needs more sustained analysis.
+Model selection (grok): always grok-4.5 unless you pass --model with a
+value that `grok models` lists. There is no separate Composer default.
 """
 import os
 import sys
@@ -38,7 +32,7 @@ AGY_SETTINGS_PATH = os.environ.get(
 LOCK_FILE = os.path.expanduser("~/.gemini/antigravity-cli/low_tier_agent.lock")
 
 DEFAULT_AGY_MODEL = "Gemini 3.6 Flash (Low)"
-DEFAULT_GROK_MODEL = "grok-composer-2.5-fast"
+DEFAULT_GROK_MODEL = "grok-4.5"
 
 AGY_HEADLESS_INSTRUCTION = (
     "You are a code-editing tool. "
@@ -800,7 +794,7 @@ def main():
     parser.add_argument("--provider", choices=["agy", "grok"], default="agy",
                         help="LLM provider: agy (Antigravity CLI) or grok (Grok CLI)")
     parser.add_argument("--model", default=None,
-                        help="Model override (default: auto per provider — 'Gemini 3.6 Flash (Low)' for agy, 'grok-composer-2.5-fast' for grok)")
+                        help="Model override (default: auto per provider — 'Gemini 3.6 Flash (Low)' for agy, 'grok-4.5' for grok)")
     parser.add_argument("--timeout", type=int, default=120, help="Process timeout in seconds")
 
     args = parser.parse_args()

@@ -1,8 +1,14 @@
 {
+  "_comment": "Repo-specific include/exclude for the symbol broker index. Edit after install.",
+  "_project_reference": "KTW monorepo often also excludes: **/masterdata/**  (large content trees). Re-add under exclude if needed.",
   "include": [
     "**/*.js", "**/*.mjs", "**/*.cjs",
     "**/*.ts", "**/*.tsx",
-    "**/*.py"
+    "**/*.py",
+    "**/*.go",
+    "**/*.rs",
+    "**/*.java",
+    "**/*.dart"
   ],
   "exclude": [
     "**/node_modules/**",
@@ -12,7 +18,8 @@
     "**/.next/**",
     "**/coverage/**",
     "**/*.min.js",
-    "**/masterdata/**",
+    "**/vendor/**",
+    "**/__pycache__/**",
     "**/skills/agent_token_usage_optimization/repo/**"
   ],
   "summary_max_files": 200

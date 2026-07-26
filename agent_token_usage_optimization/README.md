@@ -26,19 +26,22 @@ agent_token_usage_optimization/
 
 ```bash
 # 1. ALWAYS start here (summary layer)
-python3 skills/agent_token_usage_optimization/summary_broker.py search "reindexAll OR 'full scan' OR scaling" --dir models
+python3 skills/agent_token_usage_optimization/summary_broker.py search "auth OR session OR scaling" --dir src
 
 python3 .../summary_broker.py hotspots scaling
-python3 .../summary_broker.py grep "performance scales|in-app after"
+python3 .../summary_broker.py grep "rate.?limit|cache invalidat"
 
 # 2. Read a specific high-value summary (no source code)
-python3 .../summary_broker.py read models/playedgamebyusermodel.js
-python3 .../summary_broker.py rollup models
+python3 .../summary_broker.py read src/auth/session.py
+python3 .../summary_broker.py rollup src
 
 # 3. Only when you need symbols or actual code:
-python3 .../broker.py search "createPlaySession"
-python3 .../broker.py read models/foo.js --symbol someFunction
+python3 .../broker.py search "createSession"
+python3 .../broker.py read src/auth/session.py --symbol createSession
 ```
+
+Project-specific search examples (keep for monorepos with Redis/full-scan paths):
+`search "reindexAll OR 'full scan'" --dir models`, `read models/usermodel.js`.
 
 The `summary_broker.py` tool was created specifically because the original `broker.py search` only searched source + the symbol index. It ignored the far richer LLM summaries that the rest of the skill generates.
 
@@ -48,34 +51,38 @@ Dedicated companion focused on the LLM summary layer:
 
 ```bash
 # Keyword search with smart scoring (rollups + GOTCHAS sections rank higher)
-summary_broker.py search "reindexAll OR 'key scan'" --dir models --max 25
+summary_broker.py search "auth OR 'rate limit'" --dir src --max 25
 
 # Regex across every generated summary
-summary_broker.py grep "in-app after|scales with record count"
+summary_broker.py grep "scales with|cache invalidat"
 
 # Heuristic risk scanner (extremely useful for audits)
 summary_broker.py hotspots scaling
 summary_broker.py hotspots maintenance
 
 # Convenience accessors
-summary_broker.py read models/usermodel.js
-summary_broker.py rollup models
-summary_broker.py list models
+summary_broker.py read src/auth/session.py
+summary_broker.py rollup src
+summary_broker.py list src
 ```
 
 See `summary_broker.py --help` for the full set of commands.
 
 ## Grok Repo Worker
 
+Full install + usage: [docs/using_grok.md](../docs/using_grok.md) (`grok-4.5` only).
+
 `grok_repo_agent.py` is the Grok-only worker for orchestrator-led workflows.
-Use this when Codex or Claude should stay in charge while Grok Composer does
-bounded repo search or proposes one-file edits. It never applies edits.
+Use this when Codex or Claude should stay in charge while Grok (`grok-4.5`)
+does bounded repo search or proposes one-file edits. It never applies edits.
 
 By default, repo-wide Grok runs use a temporary clean copy with bulky artifacts
-excluded (`.git`, `node_modules`, tests, native builds, data directories, logs,
-media). The temporary copy also gets a tiny fresh Git repo and a local
-`.grok/config.toml` that disables codebase indexing, so Grok does not try to
-bundle the original repository history.
+excluded (`.git`, `node_modules`, `dist`/`build`, coverage, logs, vendor,
+media under tests). Add monorepo-specific trees via
+`repo/grok_clean_excludes.txt` (e.g. `masterdata/`, `lang/`, `native/` — see
+commented examples there). The temporary copy also gets a tiny fresh Git repo
+and a local `.grok/config.toml` that disables codebase indexing, so Grok does
+not try to bundle the original repository history.
 
 ```bash
 python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
@@ -101,7 +108,7 @@ python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
   --action agent-edit \
   --instruction "Add server-side validation for the invoice status field" \
   --search-root . \
-  --file adminroutes/invoices.js
+  --file src/billing/invoices.ts
 ```
 
 Useful controls:
@@ -125,7 +132,7 @@ python3 skills/agent_token_usage_optimization/low_tier_agent.py \
   --action agent-edit \
   --instruction "Add server-side validation for the invoice status field" \
   --search-root . \
-  --file adminroutes/invoices.js \
+  --file src/billing/invoices.ts \
   --provider grok
 ```
 
@@ -176,9 +183,10 @@ Model can be selected per run (provider is always `agy`):
 
 ```bash
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
-  --dir libadmin \
+  --dir src/api \
   --model "Gemini 3.6 Flash (Low)" \
   --timeout 300
+# Project ref: --dir libadmin  (or models, lib/helpers, …)
 ```
 
 `manifest.json` records the source hash for each summarized file. Changed or

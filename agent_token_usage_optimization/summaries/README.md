@@ -34,6 +34,9 @@ the right cost/quality point for this workload — summaries are short, highly
 structured, and gain nothing from a thinking tier. Prefer it unless you have a
 specific reason not to; every example below assumes it.
 
+Step-by-step install/auth/usage: [docs/using_agy_gemini_flash.md](../../docs/using_agy_gemini_flash.md).
+For the Grok parallel path (`MODEL=grok-4.5` only): [docs/using_grok.md](../../docs/using_grok.md).
+
 Select it once with agy `/model`. `run_agy_cli_summaries.sh` asserts it and
 refuses to run against anything else rather than silently switching your model.
 
@@ -71,9 +74,9 @@ so summaries stay byte-consistent with the serial path. A quota-block or refusal
 produces no `## PURPOSE` heading → **no hash is recorded**, so that file retries
 on the next run rather than caching a bad summary.
 
-Measured 2026-07-22: 187 files (backend) + 65 (Flutter) at `PARALLEL=5` on
-`Gemini 3.6 Flash (Low)` → 252/252 OK, 0 failures, manifest key counts landing
-exactly on `tracked=`.
+Throughput note (indicative only; your tree will differ): a few hundred files
+at `PARALLEL=5` on `Gemini 3.6 Flash (Low)` routinely finishes with zero
+failures when the parent merges the manifest. Tune `PARALLEL` to your quota.
 
 ### Parallel: bash Grok CLI
 
@@ -142,9 +145,11 @@ Edit `rollups_config.json`:
 
 ```json
 {
-  "include_dirs": ["lib/helpers", "lib/widgets", "libadmin"]
+  "include_dirs": ["src", "lib/helpers", "app/api"]
 }
 ```
+
+(Project ref for large monorepos: also `libadmin`, `models`, `lib/widgets`.)
 
 Then run:
 
@@ -155,7 +160,7 @@ python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 # One-off or scoped rollups:
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --dir lib/helpers
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py \
-  --dir libadmin --model "Gemini 3.6 Flash (Low)" --timeout 300
+  --dir src/api --model "Gemini 3.6 Flash (Low)" --timeout 300
 ```
 
 Rollups are hash-based. `rollups_manifest.json` records the digest of all input
@@ -170,9 +175,9 @@ regenerate despite unchanged inputs.
   never touches `settings.json`.
 - Aborts if the selected agy model != `MODEL`. That is deliberate — fix it with
   agy `/model`, do not "fix" it by making the script write settings.
-- Watch quota: one 5h window of `Gemini 3.6 Flash (Low)` is roughly 260 calls,
-  and a full two-repo refresh can approach that. Failed files keep their old
-  hash and resume free in the next window.
+- Watch quota: one 5h window of `Gemini 3.6 Flash (Low)` is on the order of a
+  few hundred calls; a full multi-repo refresh can approach that. Failed files
+  keep their old hash and resume free in the next window.
 
 ### Grok CLI path (`run_grok_cli_summaries.sh`)
 - Parallel-safe, same parent-owned-manifest design. Use when grok is the

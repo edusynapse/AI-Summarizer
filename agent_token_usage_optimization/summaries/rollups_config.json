@@ -1,5 +1,6 @@
 {
-  "_comment": "Repo-specific directory rollups. Edit include_dirs for high-value large directories only.",
+  "_comment": "Repo-specific directory rollups. Put high-value large directories in include_dirs only.",
+  "_project_reference": "Examples: lib/helpers, src/models, app/api. KTW often used: libadmin, models, lib/helpers, lib/widgets.",
   "include_dirs": [],
   "exclude_summary_files": [],
   "max_input_bytes": 120000,

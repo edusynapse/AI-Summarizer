@@ -81,8 +81,8 @@ python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect
 ```
 
 **Model guidance:**
-- `grok-composer-2.5-fast` (default) — searching, locating, edits
-- `--model grok-build` — heavy multi-file troubleshooting, log analysis, bug hunting
+- `grok-4.5` (default for Grok paths) — searching, locating, edit proposals, summaries
+- Composer models are not used; do not pass `grok-composer-*`
 
 Use your judgment — skip any step that doesn't help on the task at hand.
 <!-- END agent_token_usage_optimization -->

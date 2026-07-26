@@ -7,11 +7,12 @@ summaries, rollups, and repo_context. Use this first (per AGENTS.md / CLAUDE.md)
 before falling back to broker.py for symbol-level source inspection.
 
 Usage examples:
-  python3 skills/.../summary_broker.py search "reindexAll OR 'full scan'" --dir models
-  python3 .../summary_broker.py grep "performance scales|in-app after"
-  python3 .../summary_broker.py rollup models
-  python3 .../summary_broker.py read models/usermodel.js
+  python3 skills/.../summary_broker.py search "auth OR session" --dir src
+  python3 .../summary_broker.py grep "rate.?limit|cache invalidat"
+  python3 .../summary_broker.py rollup src
+  python3 .../summary_broker.py read src/auth/session.py
   python3 .../summary_broker.py hotspots scaling
+  # Project ref (KTW-style): search "reindexAll OR 'full scan'" --dir models
 """
 
 import argparse
@@ -157,11 +158,18 @@ def cmd_hotspots(args):
 
     category = (args.category or "all").lower()
 
+    # Generic risk patterns. Project-specific tokens (KTW ref: reindexAll,
+    # SMEMBERS, patchToLatest, model_version, DEK/admin key) can be re-added
+    # here or layered via summary_broker.py grep with a custom regex.
     patterns = {
-        "scaling": r"reindexAll|full scan|key scan|scales with|performance scales|in memory|SMEMBERS|large result|O\(n|slow at scale",
-        "security": r"PII|DEK|encryption|admin key|key rotation|scrub",
-        "maintenance": r"reindex|patchToLatest|model_version|migration",
-        "all": r"reindexAll|full scan|scales with|in-app after|SMEMBERS|large result|key scan",
+        "scaling": r"full scan|key scan|scales with|performance scales|in memory|large result|O\(n|slow at scale|N\+1|pagination",
+        "security": r"PII|encryption|secret|password|token|key rotation|scrub|authz|authorization",
+        "maintenance": r"reindex|migration|schema version|backfill|deprecat",
+        "all": r"full scan|scales with|large result|key scan|migration|N\+1|PII|secret",
+        # Project ref (uncomment / merge when useful):
+        # "scaling": r"...|reindexAll|SMEMBERS|...",
+        # "security": r"...|DEK|admin key|...",
+        # "maintenance": r"...|patchToLatest|model_version|...",
     }
 
     pat = patterns.get(category, patterns["all"])
@@ -198,7 +206,7 @@ def main():
 
     # read a specific summary file
     r = sub.add_parser("read", help="Print a specific file summary or rollup")
-    r.add_argument("target", help="e.g. models/usermodel.js  or  rollups/models.md")
+    r.add_argument("target", help="e.g. src/auth/session.py  or  rollups/src.md")
     r.set_defaults(func=cmd_read)
 
     # rollup convenience

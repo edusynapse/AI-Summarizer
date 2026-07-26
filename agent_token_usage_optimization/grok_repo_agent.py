@@ -2,7 +2,7 @@
 """Grok-only repo worker for orchestrator-led coding workflows.
 
 This script is intentionally separate from low_tier_agent.py. It lets a high
-model such as Codex or Claude orchestrate work while Grok Composer does bounded
+model such as Codex or Claude orchestrate work while Grok (grok-4.5) does bounded
 repo search or proposes one-file edits.
 
 The script never applies edits. It returns JSON for the orchestrator to inspect,
@@ -19,8 +19,12 @@ import sys
 import tempfile
 
 
-DEFAULT_MODEL = "grok-composer-2.5-fast"
+DEFAULT_MODEL = "grok-4.5"
 DEFAULT_MAX_TURNS = 8
+# Generic defaults for any repo. Project-specific bulky trees (examples for
+# large monorepos / KTW: masterdata/, lang/, native/, releases/, dev_plans/)
+# belong in repo/grok_clean_excludes.txt — not here — so install templates stay
+# repo-agnostic. Uncomment or copy those patterns into the exclude file as needed.
 DEFAULT_EXCLUDES = [
     ".git/",
     "node_modules/",
@@ -31,15 +35,19 @@ DEFAULT_EXCLUDES = [
     ".next/",
     ".cache/",
     "tmp/",
-    "test/",
-    "tests/",
-    "native/",
-    "masterdata/",
-    "lang/",
-    "**/.do_batch/",
+    "vendor/",
     "**/__pycache__/",
     "*.pyc",
     "*.log",
+    # Optional bulk dirs — enable via repo/grok_clean_excludes.txt when present:
+    # "test/",
+    # "tests/",
+    # "native/",
+    # "masterdata/",
+    # "lang/",
+    # "releases/",
+    # "dev_plans/",
+    # "**/.do_batch/",
     "tests/**/*.pdf",
     "tests/**/*.zip",
     "tests/**/*.7z",

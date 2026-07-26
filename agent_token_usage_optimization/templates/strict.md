@@ -69,13 +69,12 @@ You MUST offload simple context-gathering or localized editing tasks to a low-co
   `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action suggest-edit --file <file> --start-line <num> --end-line <num> --instruction "<text>"`
 - Fix lint/compiler errors:
   `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action inspect-errors --file <file> --error "<message>"`
-- Search the repo with a fast sub-agent (Composer 2.5) BEFORE grepping the source tree yourself:
+- Search the repo with a Grok sub-agent BEFORE grepping the source tree yourself:
   `python3 skills/agent_token_usage_optimization/low_tier_agent.py --action search --query "<what you're looking for>"`
-  Spawns a grok thread (`grok-composer-2.5-fast`) with read-only tools (grep/read_file/list_dir) that browses the repo and returns structured JSON `{found, summary, results:[{file,start_line,end_line,symbol,why}]}`. Add `--search-root <dir>` to scope it; `--file <dir>` as a focus hint.
+  Spawns a grok thread (`grok-4.5`) with read-only tools (grep/read_file/list_dir) that browses the repo and returns structured JSON `{found, summary, results:[{file,start_line,end_line,symbol,why}]}`. Add `--search-root <dir>` to scope it; `--file <dir>` as a focus hint.
 - Use Grok instead of Antigravity (optional):
-  Add `--provider grok` to any command above.
-  - **Composer (`grok-composer-2.5-fast`, the default)** — use for searching, locating, triangulating across code by reading it, and quick piece-by-piece edits. It's the right choice whenever the required output complexity is low (faster, and more faithful at reproducing verbatim edit ranges).
-  - **`--model grok-build`** — reach for it only on heavy troubleshooting: reasoning across log files, hunting bugs, or multi-file investigation that needs sustained analysis.
+  Add `--provider grok` (and optionally `--model grok-4.5`) to actions that support it.
+  Default Grok model is **`grok-4.5`** only — Composer is not an option.
 
 **Validation**: `suggest-edit` and `inspect-errors` responses include `_validation_warnings` if drift or line-count mismatches are detected. If `_validation_warnings` is present, DO NOT apply the edit blindly — re-read the target range and retry or fall back to manual editing.
 
