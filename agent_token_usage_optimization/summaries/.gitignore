@@ -1,2 +1,7 @@
-# intentionally empty — summaries/repo/ and manifest.json are committed
-# so teammates inherit the cache and don't re-summarize on checkout.
+# intentionally empty for summaries/repo/ + manifest — commit those if you want
+# teammates to inherit the LLM cache.
+#
+# Embeddings index is large/binary and backend-specific — do not commit:
+embeddings/
+embeddings/index.json
+embeddings/vectors.bin

@@ -3,16 +3,16 @@
 #
 # Usage:  ./install.sh /path/to/target_repo
 #
-# Shared files (broker.py, indexer.py, lib/*, summaries/summarizer.py,
-# summaries/run_agy_cli_summaries.sh, summaries/run_grok_cli_summaries.sh,
-# summaries/rollup_summarizer.py,
+# Shared files (broker.py, indexer.py, mcp_server.py, embeddings_index.py,
+# context_manager.py, minify.py, lib/*, summaries/summarizer.py, parallel runners,
+# rollup_summarizer.py,
 # summaries/*_prompt_template.txt, summaries/README.md, repo_context/README.md,
 # .gitignores, top-level READMEs) are always overwritten.
 #
 # Per-repo files (repo/config.json, summaries/config.json,
-# summaries/rollups_config.json, and any hand-curated repo_context/*.md beyond
-# the starter README) are NEVER overwritten if they already exist — only
-# created on first install.
+# summaries/rollups_config.json, summaries/embeddings_config.json, and any
+# hand-curated repo_context/*.md beyond the starter README) are NEVER
+# overwritten if they already exist — only created on first install.
 #
 # Generated artifacts are never overwritten. `repo/index.sqlite` is intended to
 # be tracked after `broker.py index`; Python bytecode stays ignored by the
@@ -54,12 +54,19 @@ copy_shared "indexer.py"
 copy_shared "summary_broker.py"
 copy_shared "low_tier_agent.py"
 copy_shared "grok_repo_agent.py"
+copy_shared "mcp_server.py"
+copy_shared "embeddings_index.py"
+copy_shared "context_manager.py"
+copy_shared "minify.py"
 copy_shared "lib/__init__.py"
 copy_shared "lib/languages.py"
 copy_shared "lib/outline.py"
 copy_shared "lib/search.py"
 copy_shared "lib/summarize.py"
 copy_shared "lib/summary_search.py"
+copy_shared "lib/embeddings_search.py"
+copy_shared "lib/context_tiers.py"
+copy_shared "lib/minify.py"
 copy_shared "repo/.gitignore"
 copy_shared "summaries/README.md"
 copy_shared "summaries/prompt_template.txt"
@@ -88,6 +95,7 @@ copy_template "repo/config.json"
 copy_template "repo/grok_clean_excludes.txt"
 copy_template "summaries/config.json"
 copy_template "summaries/rollups_config.json"
+copy_template "summaries/embeddings_config.json"
 
 chmod +x \
   "$DST_DIR/broker.py" \
@@ -95,6 +103,10 @@ chmod +x \
   "$DST_DIR/summary_broker.py" \
   "$DST_DIR/low_tier_agent.py" \
   "$DST_DIR/grok_repo_agent.py" \
+  "$DST_DIR/mcp_server.py" \
+  "$DST_DIR/embeddings_index.py" \
+  "$DST_DIR/context_manager.py" \
+  "$DST_DIR/minify.py" \
   "$DST_DIR/summaries/summarizer.py" \
   "$DST_DIR/summaries/rollup_summarizer.py" \
   "$DST_DIR/summaries/run_grok_cli_summaries.sh" \

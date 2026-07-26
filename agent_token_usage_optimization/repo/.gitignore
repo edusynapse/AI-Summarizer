@@ -1,1 +1,3 @@
 summaries/
+# Layer 2 session board (per-agent / per-task; do not commit)
+context_session.json

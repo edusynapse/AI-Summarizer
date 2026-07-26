@@ -11,11 +11,19 @@ Cursor, ...) calls these CLI tools instead of pasting whole files into context.
 agent_token_usage_optimization/
 ├── README.md              ← you are here
 ├── broker.py              ← original broker (symbols + source content)
-├── summary_broker.py      ← NEW: summary-layer-first broker (recommended starting point)
+├── summary_broker.py      ← summary-layer-first broker (recommended starting point)
+├── mcp_server.py          ← optional MCP stdio server (both brokers)
+├── embeddings_index.py    ← embeddings index build/search over summaries
+├── context_manager.py     ← Layer 2: pinned / working / cold
+├── minify.py              ← Layer 3: log + diff minifier
 ├── indexer.py
 ├── lib/
-│   ├── ...
-│   └── summary_search.py  ← NEW: reusable summary search engine
+│   ├── outline.py         ← tree-sitter when available, else regex
+│   ├── summary_search.py
+│   ├── embeddings_search.py
+│   ├── context_tiers.py
+│   ├── minify.py
+│   └── ...
 └── repo/
     ├── ...
     ├── summaries/         ← the rich semantic layer (LLM-generated .md files + rollups)
@@ -215,9 +223,46 @@ input summaries, so unchanged directories are skipped.
 
 **Strong recommendation:** Wire agents to prefer `summary_broker.py` for the first 1–3 retrievals on any task.
 
+## MCP (optional)
+
+```bash
+# Host cwd must be the target repo root
+python3 skills/agent_token_usage_optimization/mcp_server.py
+```
+
+See `docs/mcp_brokers.md` in the AI-Summarizer repo.
+
+## Semantic search over summaries
+
+```bash
+python3 skills/agent_token_usage_optimization/embeddings_index.py build
+python3 skills/agent_token_usage_optimization/summary_broker.py semantic "session expiry"
+```
+
+See `docs/embeddings_semantic_search.md`.
+
+## Layer 2 — tiered context
+
+```bash
+python3 skills/agent_token_usage_optimization/context_manager.py task "fix expiry"
+python3 skills/agent_token_usage_optimization/context_manager.py pin src/auth/session.py
+python3 skills/agent_token_usage_optimization/context_manager.py pack --budget 20000
+```
+
+See `docs/context_tiers.md`.
+
+## Layer 3 — minify logs / diffs
+
+```bash
+git diff | python3 skills/agent_token_usage_optimization/minify.py diff -
+python3 skills/agent_token_usage_optimization/broker.py diff
+```
+
+See `docs/log_diff_minifier.md`.
+
 ## Why this works for any agent
 
-Every modern coding agent can shell out. The broker is just a CLI — no
-agent-specific SDK, no MCP requirement (though it can be wrapped as one
-later). The contract is plain stdout text, so the same tool works whether the
-caller is Claude Code, Codex CLI, Aider, Antigravity, or a human.
+Every modern coding agent can shell out. The broker is a CLI; an optional MCP
+stdio wrapper exposes the same surface. The contract is plain stdout / MCP
+tool text, so the same logic works for Claude Code, Codex CLI, Aider,
+Antigravity, Cursor, or a human.

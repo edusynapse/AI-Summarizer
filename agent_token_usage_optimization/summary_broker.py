@@ -23,7 +23,7 @@ from pathlib import Path
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from lib import summary_search
+from lib import summary_search, embeddings_search
 
 
 def find_repo_root() -> str:
@@ -149,6 +149,18 @@ def cmd_list(args):
                 print(rel)
 
 
+def cmd_semantic(args):
+    """Embeddings-backed semantic search over the summary corpus."""
+    root = summary_search.find_summaries_root()
+    results = embeddings_search.search_semantic(
+        query=args.query,
+        summaries_root=root,
+        max_results=args.max,
+        dir_filter=args.dir,
+    )
+    print(embeddings_search.render_semantic_results(results))
+
+
 def cmd_hotspots(args):
     """Heuristic scan for common scaling / maintenance / risk patterns."""
     root = summary_search.find_summaries_root()
@@ -225,6 +237,13 @@ def main():
                     choices=["all", "scaling", "security", "maintenance"])
     hs.add_argument("--max", type=int, default=50)
     hs.set_defaults(func=cmd_hotspots)
+
+    # semantic (embeddings index — build with embeddings_index.py)
+    sem = sub.add_parser("semantic", help="Embeddings semantic search over summaries (see embeddings_index.py)")
+    sem.add_argument("query")
+    sem.add_argument("--dir", help="optional subdirectory filter")
+    sem.add_argument("--max", type=int, default=20)
+    sem.set_defaults(func=cmd_semantic)
 
     args = p.parse_args()
     args.func(args)

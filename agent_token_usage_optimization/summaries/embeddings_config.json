@@ -1,0 +1,13 @@
+{
+  "_comment": "Embeddings semantic search over summaries/repo (+ rollups). See docs/embeddings_semantic_search.md",
+  "_backends": "hashing (default, zero-dep) | openai | ollama | st (sentence-transformers)",
+  "backend": "hashing",
+  "dim": 384,
+  "model": "text-embedding-3-small",
+  "openai_base_url": "https://api.openai.com/v1",
+  "ollama_base_url": "http://127.0.0.1:11434",
+  "ollama_model": "nomic-embed-text",
+  "st_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "include_rollups": true,
+  "max_chars_per_doc": 6000
+}

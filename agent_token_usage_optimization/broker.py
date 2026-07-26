@@ -50,7 +50,7 @@ def cmd_outline(args):
         print(f"(no outline support for: {args.file})")
         return
     symbols = outline.extract(text, lang)
-    print(f"FILE: {args.file}  lang={lang}  symbols={len(symbols)}")
+    print(f"FILE: {args.file}  lang={lang}  backend={outline.backend_name()}  symbols={len(symbols)}")
     print(outline.render(symbols))
 
 def cmd_read(args):
@@ -86,13 +86,26 @@ def cmd_diff(args):
         ).stdout
     except Exception as e:
         print(f"git diff failed: {e}"); return
-    # strip the noisy `index abc..def` and `diff --git` repetition; keep file headers + hunks
-    out_lines = []
-    for line in out.splitlines():
-        if line.startswith("index ") or line.startswith("diff --git "):
-            continue
-        out_lines.append(line)
-    print("\n".join(out_lines))
+    # Layer 3 minifier (also available as minify.py diff)
+    from lib import minify as mz
+    if args.raw:
+        # legacy light strip only
+        out_lines = []
+        for line in out.splitlines():
+            if line.startswith("index ") or line.startswith("diff --git "):
+                continue
+            out_lines.append(line)
+        print("\n".join(out_lines))
+        return
+    text, stats = mz.minify_diff(
+        out,
+        max_hunk_lines=args.max_hunk,
+        max_file_lines=args.max_file,
+        max_total_lines=args.max_total,
+    )
+    print(text, end="" if text.endswith("\n") or not text else "\n")
+    if not args.quiet:
+        print(mz.format_stats("diff", stats), file=sys.stderr)
 
 def cmd_summary(args):
     if args.file:
@@ -168,8 +181,14 @@ def main():
     s.add_argument("--symbol"); s.add_argument("--lines")
     s.set_defaults(func=cmd_read)
 
-    s = sub.add_parser("diff"); s.add_argument("rev", nargs="?")
+    s = sub.add_parser("diff", help="git diff through Layer 3 minifier")
+    s.add_argument("rev", nargs="?")
     s.add_argument("--context", type=int, default=2)
+    s.add_argument("--max-hunk", type=int, default=80)
+    s.add_argument("--max-file", type=int, default=200)
+    s.add_argument("--max-total", type=int, default=800)
+    s.add_argument("--raw", action="store_true", help="light strip only (no hunk caps)")
+    s.add_argument("-q", "--quiet", action="store_true", help="hide minify stats on stderr")
     s.set_defaults(func=cmd_diff)
 
     s = sub.add_parser("summary"); s.add_argument("file", nargs="?")

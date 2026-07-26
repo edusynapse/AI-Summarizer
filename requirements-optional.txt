@@ -1,0 +1,9 @@
+# Optional extras for AI-Summarizer skill features.
+# Core brokers/indexer/summarizer CLIs need only Python 3.9+ stdlib + agy/grok CLIs.
+
+# Higher-accuracy symbol outlines (lib/outline.py tree-sitter path)
+tree-sitter>=0.22.0
+tree-sitter-language-pack>=0.2.0
+
+# Local neural embeddings (summaries/embeddings_config.json backend=st)
+# sentence-transformers>=3.0.0
