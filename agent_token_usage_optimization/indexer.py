@@ -13,15 +13,18 @@ import sqlite3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from lib import outline, languages, summarize  # noqa: E402
+from lib import outline, languages, summarize, adjacency, workspace_config  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 REPO_DIR = os.path.join(HERE, "repo")
+SKILL_DIR = HERE
 DEFAULT_CONFIG = {
     "include": ["**/*.js", "**/*.mjs", "**/*.ts", "**/*.tsx", "**/*.py",
                 "**/*.dart", "**/*.rs", "**/*.go", "**/*.java"],
     "exclude": ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**",
                 "**/.next/**", "**/coverage/**", "**/*.min.js",
-                "**/skills/agent_token_usage_optimization/repo/**"],
+                "**/skills/agent_token_usage_optimization/repo/**",
+                "**/skills/agent_token_usage_optimization/**"],
     "summary_max_files": 200,
 }
 
@@ -89,6 +92,7 @@ def build():
     file_count = 0
     sym_count = 0
     summary_entries = []
+    adj_files = []  # (rel, full, lang) for THIS repo only
 
     for full, rel in _walk(root, cfg):
         try:
@@ -107,6 +111,7 @@ def build():
                          (rel, line_no, kind, name, sig))
         sym_count += len(symbols)
         file_count += 1
+        adj_files.append((rel, full, lang))
 
         # cache per-file summary keyed by hash
         cache_path = os.path.join(summaries_dir, f"{h}.txt")
@@ -120,6 +125,23 @@ def build():
 
     _write_repo_summary(summary_entries, cfg)
     print(f"indexed {file_count} files, {sym_count} symbols → {db_path}")
+
+    # Per-repo adjacency DB only (never merges sibling repos)
+    ws = workspace_config.load_workspace(Path(SKILL_DIR))
+    prefixes = ws.get("package_prefixes") or {}
+    adj_stats = adjacency.rebuild_adjacency(
+        Path(SKILL_DIR),
+        Path(root),
+        adj_files,
+        package_prefixes=prefixes,
+    )
+    print(
+        f"adjacency {adj_stats.get('edges', 0)} edges / "
+        f"{adj_stats.get('path_hits', 0)} http path hits / "
+        f"{adj_stats.get('files', 0)} files → {adj_stats.get('path')}"
+    )
+    for w in ws.get("warnings") or []:
+        print(f"workspace warning: {w}")
 
 def _write_repo_summary(entries, cfg):
     entries.sort(key=lambda e: -e[1])

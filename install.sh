@@ -5,12 +5,13 @@
 #
 # Shared files (broker.py, indexer.py, mcp_server.py, embeddings_index.py,
 # context_manager.py, minify.py, lib/*, summaries/summarizer.py, parallel runners,
-# rollup_summarizer.py,
+# rollup_summarizer.py, summaries/postprocess_summaries.py,
 # summaries/*_prompt_template.txt, summaries/README.md, repo_context/README.md,
-# .gitignores, top-level READMEs) are always overwritten.
+# repo/workspace.env.example, .gitignores, top-level READMEs) are always overwritten.
 #
 # Per-repo files (repo/config.json, summaries/config.json,
-# summaries/rollups_config.json, summaries/embeddings_config.json, and any
+# summaries/rollups_config.json, summaries/embeddings_config.json,
+# repo/workspace.env (local paths — never overwrite), and any
 # hand-curated repo_context/*.md beyond the starter README) are NEVER
 # overwritten if they already exist — only created on first install.
 #
@@ -67,12 +68,17 @@ copy_shared "lib/summary_search.py"
 copy_shared "lib/embeddings_search.py"
 copy_shared "lib/context_tiers.py"
 copy_shared "lib/minify.py"
+copy_shared "lib/workspace_config.py"
+copy_shared "lib/adjacency.py"
+copy_shared "lib/summary_postprocess.py"
 copy_shared "repo/.gitignore"
+copy_shared "repo/workspace.env.example"
 copy_shared "summaries/README.md"
 copy_shared "summaries/prompt_template.txt"
 copy_shared "summaries/rollup_prompt_template.txt"
 copy_shared "summaries/summarizer.py"
 copy_shared "summaries/rollup_summarizer.py"
+copy_shared "summaries/postprocess_summaries.py"
 copy_shared "summaries/run_grok_cli_summaries.sh"
 copy_shared "summaries/run_agy_cli_summaries.sh"
 copy_shared "summaries/.gitignore"
@@ -96,6 +102,15 @@ copy_template "repo/grok_clean_excludes.txt"
 copy_template "summaries/config.json"
 copy_template "summaries/rollups_config.json"
 copy_template "summaries/embeddings_config.json"
+# workspace.env: copy from example once only (local machine paths)
+if [[ ! -e "$DST_DIR/repo/workspace.env" ]]; then
+  if [[ -f "$DST_DIR/repo/workspace.env.example" ]]; then
+    cp "$DST_DIR/repo/workspace.env.example" "$DST_DIR/repo/workspace.env"
+    echo "  installed: repo/workspace.env (from example — edit WORKSPACE_SIBLINGS)"
+  fi
+else
+  echo "  preserved (already exists): repo/workspace.env"
+fi
 
 chmod +x \
   "$DST_DIR/broker.py" \
@@ -109,6 +124,7 @@ chmod +x \
   "$DST_DIR/minify.py" \
   "$DST_DIR/summaries/summarizer.py" \
   "$DST_DIR/summaries/rollup_summarizer.py" \
+  "$DST_DIR/summaries/postprocess_summaries.py" \
   "$DST_DIR/summaries/run_grok_cli_summaries.sh" \
   "$DST_DIR/summaries/run_agy_cli_summaries.sh" \
   || true
@@ -169,7 +185,10 @@ echo "  edit  skills/agent_token_usage_optimization/repo/config.json"
 echo "  edit  skills/agent_token_usage_optimization/summaries/config.json"
 echo "  edit  skills/agent_token_usage_optimization/summaries/rollups_config.json"
 echo "  fill  skills/agent_token_usage_optimization/summaries/repo_context/*.md"
-echo "  run   python3 skills/agent_token_usage_optimization/broker.py index"
+echo "  edit  skills/agent_token_usage_optimization/repo/workspace.env   # multi-repo siblings (optional)"
+echo "  or    $(cd "$(dirname "$0")" && pwd)/configure_workspace.sh $TARGET --id … --sibling id=/path"
+echo "  run   python3 skills/agent_token_usage_optimization/broker.py index   # symbols + adjacency.sqlite (THIS repo only)"
+echo "  run   python3 skills/agent_token_usage_optimization/summaries/postprocess_summaries.py"
 echo "  run   python3 skills/agent_token_usage_optimization/summaries/summarizer.py --dry-run"
 echo "  run   bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh"
 echo "        # parallel path via grok CLI. MODEL=… PARALLEL=…"

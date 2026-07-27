@@ -209,6 +209,21 @@ def write_summary(rel, body):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w") as f:
         f.write(body.rstrip() + "\n")
+    # Resolve NAVIGATION lines + inject ADJACENT (this repo only; no LLM)
+    try:
+        skill = os.path.abspath(os.path.join(HERE, ".."))
+        sys.path.insert(0, skill)
+        from lib import summary_postprocess  # noqa: WPS433
+        from pathlib import Path
+        summary_postprocess.postprocess_summary_file(
+            Path(out),
+            Path(REPO_ROOT) / rel,
+            rel,
+            Path(skill),
+            inject_adjacent=True,
+        )
+    except Exception as e:
+        print(f"    postprocess skip: {e}", flush=True)
 
 
 def prune_summary(rel):

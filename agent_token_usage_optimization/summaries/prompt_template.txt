@@ -31,13 +31,21 @@ Skip private helpers. If the file exports nothing public, write the
 single line: none.
 
 ## NAVIGATION
-Bullet list, max 6 items. Point agents to the highest-value locations using:
+Bullet list, max 8 items. Point agents to the highest-value locations using:
 - `<role>` — `<exact qualified symbol or unique searchable anchor>` — approx lines `<start>-<end>`
 Prioritize entrypoints, main control flow, validation, persistence/network
-boundaries, and error/fallback paths. Include useful cross-file jumps as
-`calls/called by/implements/registered in -> path::symbol`. Line numbers are
-approximate hints: never give one without an exact symbol or unique anchor.
+boundaries, and error/fallback paths. INCLUDE private control-plane methods
+when they own the real work (e.g. `_fetchX`, `_handleSave`). Include useful
+cross-file jumps as `calls/called by -> path::symbol`. Line numbers are
+approximate only — a post-processor will replace them from the symbol outline.
+Never give a line range without an exact symbol or unique anchor.
 Write `none` only when the file has no meaningful internal navigation points.
+
+## NEXT HOP
+Exactly one line. Best first symbol to open for a typical change to this file:
+`broker.py read {path} --symbol <ExactName>`
+Use the real path of this file for {path}. If no single symbol fits:
+`broker.py outline {path}`
 
 ## INTERNAL DEPENDENCIES
 Comma-separated list of INTERNAL modules this file imports (relative
@@ -76,6 +84,7 @@ HARD RULES (violations make the summary useless):
 - Preserve exact casing and spelling for symbols, routes, config keys,
   environment variables, database entities, events, and error anchors.
 - Prefer stable symbols and unique text anchors over line numbers.
+- Always emit NEXT HOP with a real symbol name when any export or method exists.
 - Do not summarize the imports list as content.
 - Do not describe coding style, formatting, or language features.
 - Do not speculate about future work or refactoring opportunities.

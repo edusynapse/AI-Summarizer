@@ -1,3 +1,8 @@
 summaries/
 # Layer 2 session board (per-agent / per-task; do not commit)
 context_session.json
+# Local multi-repo paths (machine-specific)
+workspace.env
+# Generated indexes (optionally commit index.sqlite if you want instant search)
+# adjacency is always local-rebuild
+adjacency.sqlite

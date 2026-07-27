@@ -437,12 +437,30 @@ Deep dive: [docs/mcp_brokers.md](docs/mcp_brokers.md).
 
 ---
 
+## Multi-repo (separate stores — mandatory model)
+
+Each repo keeps its **own** `summaries/`, `repo/index.sqlite`, and `repo/adjacency.sqlite`.  
+`workspace.env` only lists sibling paths; tools use `--repo <id>` to **read** that sibling’s stores. DBs are never merged.
+
+```bash
+./install.sh /path/to/app
+./install.sh /path/to/api
+./configure_workspace.sh /path/to/app --id app --role app --sibling api=/path/to/api
+cd /path/to/app && python3 skills/…/broker.py index   # builds THIS repo adjacency only
+python3 skills/…/summary_broker.py adjacent path/to/file
+python3 skills/…/summary_broker.py --repo api search "…"
+python3 skills/…/summaries/postprocess_summaries.py   # fix NAVIGATION lines + inject ADJACENT
+```
+
+See [docs/workspace_multi_repo.md](docs/workspace_multi_repo.md).
+
 ## Feature docs index
 
 | Doc | Feature |
 |-----|---------|
 | [docs/using_agy_gemini_flash.md](docs/using_agy_gemini_flash.md) | AGY + Gemini 3.6 Flash (Low) install/usage |
 | [docs/using_grok.md](docs/using_grok.md) | Grok CLI + `grok-4.5` install/usage |
+| [docs/workspace_multi_repo.md](docs/workspace_multi_repo.md) | Multi-repo: separate DBs + workspace.env |
 | [docs/context_tiers.md](docs/context_tiers.md) | Layer 2: pinned / working / cold |
 | [docs/log_diff_minifier.md](docs/log_diff_minifier.md) | Layer 3: log + diff minifier |
 | [docs/tree_sitter_outline.md](docs/tree_sitter_outline.md) | Tree-sitter outlines |
