@@ -8,6 +8,7 @@
 # rollup_summarizer.py, summaries/postprocess_summaries.py,
 # summaries/*_prompt_template.txt, summaries/README.md, repo_context/README.md,
 # repo/workspace.env.example, .gitignores, top-level READMEs) are always overwritten.
+# NOTE: grok_repo_agent.py is intentionally NOT installed (parked under scratch/parked/).
 #
 # Per-repo files (repo/config.json, summaries/config.json,
 # summaries/rollups_config.json, summaries/embeddings_config.json,
@@ -54,7 +55,7 @@ copy_shared "broker.py"
 copy_shared "indexer.py"
 copy_shared "summary_broker.py"
 copy_shared "low_tier_agent.py"
-copy_shared "grok_repo_agent.py"
+# grok_repo_agent.py is PARKED under scratch/parked/ — do not install
 copy_shared "mcp_server.py"
 copy_shared "embeddings_index.py"
 copy_shared "context_manager.py"
@@ -98,7 +99,7 @@ copy_template() {
 }
 
 copy_template "repo/config.json"
-copy_template "repo/grok_clean_excludes.txt"
+# repo/grok_clean_excludes.txt parked with grok_repo_agent
 copy_template "summaries/config.json"
 copy_template "summaries/rollups_config.json"
 copy_template "summaries/embeddings_config.json"
@@ -117,7 +118,6 @@ chmod +x \
   "$DST_DIR/indexer.py" \
   "$DST_DIR/summary_broker.py" \
   "$DST_DIR/low_tier_agent.py" \
-  "$DST_DIR/grok_repo_agent.py" \
   "$DST_DIR/mcp_server.py" \
   "$DST_DIR/embeddings_index.py" \
   "$DST_DIR/context_manager.py" \

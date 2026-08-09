@@ -103,7 +103,7 @@ to have symbol search immediately after checkout. Python bytecode (`__pycache__/
 | Doc | Contents |
 |-----|----------|
 | [docs/using_agy_gemini_flash.md](docs/using_agy_gemini_flash.md) | Install/auth AGY, select Flash (Low), parallel + serial summarization, rollups, gotchas |
-| [docs/using_grok.md](docs/using_grok.md) | Install/auth Grok CLI, `grok-4.5` only, parallel summaries, `grok_repo_agent` / low-tier |
+| [docs/using_grok.md](docs/using_grok.md) | Install/auth Grok CLI for **bulk summaries** only (`grok_repo_agent` disabled) |
 
 ## License
 

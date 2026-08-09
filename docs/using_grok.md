@@ -68,8 +68,10 @@ python3 skills/agent_token_usage_optimization/broker.py index
 | Tool | Purpose | Default model |
 |------|---------|---------------|
 | `summaries/run_grok_cli_summaries.sh` | Parallel **file summaries** (bulk) | `grok-4.5` |
-| `grok_repo_agent.py` | Repo **search** / **agent-edit** proposals (orchestrator-led) | `grok-4.5` |
-| `low_tier_agent.py --provider grok` | Bounded tasks (find-symbol, suggest-edit, search, agent-edit) | `grok-4.5` |
+| `low_tier_agent.py --provider grok` | Optional bounded tasks only (prefer `--provider agy`) | `grok-4.5` |
+
+**`grok_repo_agent.py` is DISABLED** — parked at `scratch/parked/grok_repo_agent.py`
+in the AI-Summarizer source tree; not installed into consumer repos.
 
 Brokers (`summary_broker.py`, `broker.py`) do **not** call Grok; they only
 read summaries / the symbol index / source.
@@ -114,43 +116,10 @@ Design notes:
 
 ---
 
-## 5. Repo worker: search & edit proposals
+## 5. Repo worker (search & edit proposals) — removed
 
-```bash
-# Bounded search (read-only tools inside grok)
-python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
-  --action search \
-  --query "where are app settings loaded and validated?" \
-  --search-root . \
-  --cwd-strategy clean-copy \
-  --model grok-4.5
-
-# Size of the clean workspace without calling the model
-python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
-  --action inspect-workspace \
-  --search-root . \
-  --cwd-strategy clean-copy
-
-# One-file edit proposal (never applied by the script)
-python3 skills/agent_token_usage_optimization/grok_repo_agent.py \
-  --action agent-edit \
-  --instruction "Add server-side validation for the invoice status field" \
-  --file src/billing/invoices.ts \
-  --search-root . \
-  --model grok-4.5
-```
-
-Clean-copy excludes bulky trees (see `repo/grok_clean_excludes.txt`). Multi-file
-batches: `--action agent-edit-multi` (same model).
-
-### Preflight (agents)
-
-```bash
-grok --version &>/dev/null && echo "grok: ok" || echo "grok: UNAVAILABLE"
-```
-
-If unavailable, skip `grok_repo_agent.py` and use direct read/edit or
-`low_tier_agent.py --provider agy` where installed.
+Do not use `grok_repo_agent.py`. Use `summary_broker.py` / `broker.py` and
+direct editor tools. Parked source: `scratch/parked/grok_repo_agent.py`.
 
 ---
 

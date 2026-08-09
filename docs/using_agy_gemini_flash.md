@@ -89,7 +89,7 @@ python3 skills/agent_token_usage_optimization/broker.py index
 | `summaries/rollup_summarizer.py` | Directory rollups | Serial; same agy provider |
 | `low_tier_agent.py` (default provider) | find-symbol, suggest-edit, … | Default model Flash (Low); uses a lock + settings swap |
 
-`grok_repo_agent.py` is Grok-only — see [using_grok.md](using_grok.md).
+`grok_repo_agent.py` is **disabled** (parked; not installed). Prefer brokers + agy low-tier if needed.
 
 ---
 
