@@ -13,7 +13,7 @@ Run:
   python3 rollup_summarizer.py --dry-run
   python3 rollup_summarizer.py
   python3 rollup_summarizer.py --dir lib/helpers
-  python3 rollup_summarizer.py --dir src/api --model "Gemini 3.6 Flash (Low)"
+  python3 rollup_summarizer.py --dir src/api --model "Gemini 3.7 Flash (Low)"
   python3 rollup_summarizer.py --force --dir routes
   # Project ref: --dir libadmin  (or models, lib/widgets, …)
 """

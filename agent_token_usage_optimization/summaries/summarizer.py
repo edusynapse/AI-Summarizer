@@ -38,7 +38,7 @@ AGY_SETTINGS_PATH = os.environ.get(
     os.path.expanduser("~/.gemini/antigravity-cli/settings.json"),
 )
 DEFAULT_PROVIDER = "agy"
-DEFAULT_AGY_MODEL = "Gemini 3.6 Flash (Low)"
+DEFAULT_AGY_MODEL = "Gemini 3.7 Flash (Low)"
 
 AGY_HEADLESS_INSTRUCTION = (
     "Do not use tools, do not write files, and do not explain. "

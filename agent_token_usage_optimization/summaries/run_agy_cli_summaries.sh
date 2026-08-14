@@ -17,7 +17,7 @@
 # Usage (from target repo root):
 #   bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
 #
-#   PARALLEL=5 MODEL="Gemini 3.6 Flash (Low)" \
+#   PARALLEL=5 MODEL="Gemini 3.7 Flash (Low)" \
 #     bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
 #
 #   # restrict scope (fnmatch on relpath); pruning is suppressed when scoped:
@@ -45,7 +45,7 @@ RESULTS_DIR="${RESULTS_DIR:-$SCRATCH/results}"
 LOG="${LOG:-$SCRATCH/batch.log}"
 
 PARALLEL="${PARALLEL:-5}"
-MODEL="${MODEL:-Gemini 3.6 Flash (Low)}"
+MODEL="${MODEL:-Gemini 3.7 Flash (Low)}"
 AGY_TIMEOUT="${AGY_TIMEOUT:-300}"
 ONLY="${ONLY:-}"
 

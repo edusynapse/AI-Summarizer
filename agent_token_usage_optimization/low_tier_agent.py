@@ -6,7 +6,7 @@ by executing tasks against a low-cost, fast model via the agy or grok
 CLI tools.
 
 Providers:
-  agy  — Antigravity CLI, uses Gemini 3.6 Flash (Low) by default.
+  agy  — Antigravity CLI, uses Gemini 3.7 Flash (Low) by default.
   grok — Grok CLI, uses grok-4.5 by default (Composer is not offered).
 
 The `search` and `agent-edit` actions spawn a grok sub-agent thread with
@@ -31,7 +31,7 @@ AGY_SETTINGS_PATH = os.environ.get(
 )
 LOCK_FILE = os.path.expanduser("~/.gemini/antigravity-cli/low_tier_agent.lock")
 
-DEFAULT_AGY_MODEL = "Gemini 3.6 Flash (Low)"
+DEFAULT_AGY_MODEL = "Gemini 3.7 Flash (Low)"
 DEFAULT_GROK_MODEL = "grok-4.5"
 
 AGY_HEADLESS_INSTRUCTION = (
@@ -794,7 +794,7 @@ def main():
     parser.add_argument("--provider", choices=["agy", "grok"], default="agy",
                         help="LLM provider: agy (Antigravity CLI) or grok (Grok CLI)")
     parser.add_argument("--model", default=None,
-                        help="Model override (default: auto per provider — 'Gemini 3.6 Flash (Low)' for agy, 'grok-4.5' for grok)")
+                        help="Model override (default: auto per provider — 'Gemini 3.7 Flash (Low)' for agy, 'grok-4.5' for grok)")
     parser.add_argument("--timeout", type=int, default=120, help="Process timeout in seconds")
 
     args = parser.parse_args()

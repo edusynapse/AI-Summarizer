@@ -180,6 +180,6 @@ python3 skills/agent_token_usage_optimization/indexer.py
 
 ## 9. See also
 
-- [using_agy_gemini_flash.md](using_agy_gemini_flash.md) — AGY + Gemini 3.6 Flash (Low)
+- [using_agy_gemini_flash.md](using_agy_gemini_flash.md) — AGY + Gemini 3.7 Flash (Low)
 - Root [README.md](../README.md) — install layout, profiles
 - [summaries/README.md](../agent_token_usage_optimization/summaries/README.md) — cache / rollups design

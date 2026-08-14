@@ -147,7 +147,7 @@ Model can be selected per run (provider is always `agy`):
 ```bash
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir src/api \
-  --model "Gemini 3.6 Flash (Low)" \
+  --model "Gemini 3.7 Flash (Low)" \
   --timeout 300
 # Project ref: --dir libadmin  (or models, lib/helpers, …)
 ```

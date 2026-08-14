@@ -29,7 +29,7 @@ Shared files are identical in every repo. `config.json`, `manifest.json`,
 
 ## Model
 
-**Current best for summarization: `Gemini 3.6 Flash (Low)` via `agy`.** It is
+**Current best for summarization: `Gemini 3.7 Flash (Low)` via `agy`.** It is
 the right cost/quality point for this workload — summaries are short, highly
 structured, and gain nothing from a thinking tier. Prefer it unless you have a
 specific reason not to; every example below assumes it.
@@ -56,7 +56,7 @@ re-summarize those files on the next run.
 bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
 
 # tune:
-PARALLEL=5 MODEL="Gemini 3.6 Flash (Low)" \
+PARALLEL=5 MODEL="Gemini 3.7 Flash (Low)" \
   bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
 
 # scope to a subset (fnmatch on relpath; pruning is suppressed when scoped):
@@ -75,7 +75,7 @@ produces no `## PURPOSE` heading → **no hash is recorded**, so that file retri
 on the next run rather than caching a bad summary.
 
 Throughput note (indicative only; your tree will differ): a few hundred files
-at `PARALLEL=5` on `Gemini 3.6 Flash (Low)` routinely finishes with zero
+at `PARALLEL=5` on `Gemini 3.7 Flash (Low)` routinely finishes with zero
 failures when the parent merges the manifest. Tune `PARALLEL` to your quota.
 
 ### Parallel: bash Grok CLI
@@ -117,10 +117,10 @@ python3 skills/agent_token_usage_optimization/summaries/summarizer.py --limit 20
 
 # Pick the model for a scoped run (provider is always agy).
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
-  --model "Gemini 3.6 Flash (Low)"
+  --model "Gemini 3.7 Flash (Low)"
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir models \
-  --model "Gemini 3.6 Flash (Low)" \
+  --model "Gemini 3.7 Flash (Low)" \
   --timeout 300
 ```
 
@@ -160,7 +160,7 @@ python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 # One-off or scoped rollups:
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --dir lib/helpers
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py \
-  --dir src/api --model "Gemini 3.6 Flash (Low)" --timeout 300
+  --dir src/api --model "Gemini 3.7 Flash (Low)" --timeout 300
 ```
 
 Rollups are hash-based. `rollups_manifest.json` records the digest of all input
@@ -175,7 +175,7 @@ regenerate despite unchanged inputs.
   never touches `settings.json`.
 - Aborts if the selected agy model != `MODEL`. That is deliberate — fix it with
   agy `/model`, do not "fix" it by making the script write settings.
-- Watch quota: one 5h window of `Gemini 3.6 Flash (Low)` is on the order of a
+- Watch quota: one 5h window of `Gemini 3.7 Flash (Low)` is on the order of a
   few hundred calls; a full multi-repo refresh can approach that. Failed files
   keep their old hash and resume free in the next window.
 
@@ -187,7 +187,7 @@ regenerate despite unchanged inputs.
 - Failures leave the previous hash so the next run retries those files.
 
 ### AGY path (`summarizer.py --provider agy`)
-- Default backend for `summarizer.py` is `agy` / `Gemini 3.6 Flash (Low)`.
+- Default backend for `summarizer.py` is `agy` / `Gemini 3.7 Flash (Low)`.
 - `agy` CLI must be on `$PATH` and authenticated.
 - `agy` has no safe per-call model flag here. The summarizer temporarily writes
   the requested model to `~/.gemini/antigravity-cli/settings.json`, calls `agy`

@@ -25,6 +25,6 @@
   "max_input_bytes": 500000,
   "max_files_per_run": 0,
   "provider": "agy",
-  "model": "Gemini 3.6 Flash (Low)",
+  "model": "Gemini 3.7 Flash (Low)",
   "agy_timeout_sec": 300
 }

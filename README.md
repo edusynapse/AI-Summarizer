@@ -93,7 +93,7 @@ to have symbol search immediately after checkout. Python bytecode (`__pycache__/
 
 - **Python 3.9+** (stdlib only for brokers/indexer; no pip package required)
 - Optional LLM CLIs on `$PATH` for summarization / low-tier agents:
-  - `agy` (Antigravity) + model **Gemini 3.6 Flash (Low)**
+  - `agy` (Antigravity) + model **Gemini 3.7 Flash (Low)**
   - `grok` (xAI Grok CLI) + model **`grok-4.5`** (Composer is not used)
 - Brokers and the symbol index work **without** an LLM once summaries exist
   (or if you only use `broker.py` against source)
@@ -206,7 +206,7 @@ python3 skills/agent_token_usage_optimization/broker.py index
 # writes settings.json (see summaries/README.md).
 PARALLEL=5 bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
 # or grok: bash skills/agent_token_usage_optimization/summaries/run_grok_cli_summaries.sh
-# alternate serial: python3 …/summarizer.py --provider agy --model "Gemini 3.6 Flash (Low)"
+# alternate serial: python3 …/summarizer.py --provider agy --model "Gemini 3.7 Flash (Low)"
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 python3 skills/agent_token_usage_optimization/indexer.py
 
@@ -458,7 +458,7 @@ See [docs/workspace_multi_repo.md](docs/workspace_multi_repo.md).
 
 | Doc | Feature |
 |-----|---------|
-| [docs/using_agy_gemini_flash.md](docs/using_agy_gemini_flash.md) | AGY + Gemini 3.6 Flash (Low) install/usage |
+| [docs/using_agy_gemini_flash.md](docs/using_agy_gemini_flash.md) | AGY + Gemini 3.7 Flash (Low) install/usage |
 | [docs/using_grok.md](docs/using_grok.md) | Grok CLI + `grok-4.5` install/usage |
 | [docs/workspace_multi_repo.md](docs/workspace_multi_repo.md) | Multi-repo: separate DBs + workspace.env |
 | [docs/context_tiers.md](docs/context_tiers.md) | Layer 2: pinned / working / cold |

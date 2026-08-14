@@ -1,11 +1,11 @@
-# Using AGY + Gemini 3.6 Flash (Low)
+# Using AGY + Gemini 3.7 Flash (Low)
 
 This skill’s default summarization path uses the **Antigravity CLI** (`agy`)
 with model:
 
 | Role | Model display name (exact string) |
 |------|-----------------------------------|
-| File summaries, rollups, many low-tier tasks | **`Gemini 3.6 Flash (Low)`** |
+| File summaries, rollups, many low-tier tasks | **`Gemini 3.7 Flash (Low)`** |
 
 That name must match what `agy` stores in its settings (including spaces and
 parentheses). Prefer Flash (Low) for this workload: short structured
@@ -37,14 +37,14 @@ Interactive:
 
 ```bash
 agy /model
-# choose: Gemini 3.6 Flash (Low)
+# choose: Gemini 3.7 Flash (Low)
 ```
 
 Or ensure `settings.json` contains:
 
 ```json
 {
-  "model": "Gemini 3.6 Flash (Low)"
+  "model": "Gemini 3.7 Flash (Low)"
 }
 ```
 
@@ -67,7 +67,7 @@ In the **target** repo, templates already default to agy + Flash (Low):
 // skills/agent_token_usage_optimization/summaries/config.json
 {
   "provider": "agy",
-  "model": "Gemini 3.6 Flash (Low)",
+  "model": "Gemini 3.7 Flash (Low)",
   "agy_timeout_sec": 300
 }
 ```
@@ -102,7 +102,7 @@ From the **target repo root**, after `agy /model` is Flash (Low):
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py --dry-run
 
 # Parallel AGY — parent owns manifest.json
-PARALLEL=5 MODEL="Gemini 3.6 Flash (Low)" \
+PARALLEL=5 MODEL="Gemini 3.7 Flash (Low)" \
   bash skills/agent_token_usage_optimization/summaries/run_agy_cli_summaries.sh
 
 # Scope (fnmatch on relative path; pruning suppressed when scoped)
@@ -114,7 +114,7 @@ python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py --d
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py
 python3 skills/agent_token_usage_optimization/summaries/rollup_summarizer.py \
   --dir src/api \
-  --model "Gemini 3.6 Flash (Low)" \
+  --model "Gemini 3.7 Flash (Low)" \
   --timeout 300
 ```
 
@@ -122,7 +122,7 @@ Useful env vars for the AGY runner:
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `MODEL` | `Gemini 3.6 Flash (Low)` | Must match selected agy model exactly |
+| `MODEL` | `Gemini 3.7 Flash (Low)` | Must match selected agy model exactly |
 | `PARALLEL` | `5` | Concurrent workers |
 | `AGY_TIMEOUT` | `300` | Per-file timeout (seconds) |
 | `ONLY` | (empty) | `fnmatch` filter on relpath |
@@ -138,7 +138,7 @@ end. Concurrent processes **drop each other’s hashes**. Always use
 ```bash
 python3 skills/agent_token_usage_optimization/summaries/summarizer.py \
   --dir src/api \
-  --model "Gemini 3.6 Flash (Low)" \
+  --model "Gemini 3.7 Flash (Low)" \
   --timeout 300
 ```
 
@@ -209,7 +209,7 @@ python3 skills/agent_token_usage_optimization/indexer.py
 
 | Symptom | Likely fix |
 |---------|------------|
-| `ABORT: agy model is … but this run wants …` | `agy /model` → **Gemini 3.6 Flash (Low)** (exact string) |
+| `ABORT: agy model is … but this run wants …` | `agy /model` → **Gemini 3.7 Flash (Low)** (exact string) |
 | `settings.json` not found | Install/auth agy; check `AGY_SETTINGS_PATH` |
 | Summaries missing sections / no hash | Refusal or quota; re-run after window resets |
 | Interactive `agy` model flips mid-batch | Use parallel runner only (never serial) while you work in another terminal |
